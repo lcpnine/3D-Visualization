@@ -63,7 +63,7 @@ class Config:
     # RANSAC for Fundamental Matrix
     RANSAC_ITERATIONS = 5000  # Number of RANSAC iterations (increased for better convergence)
     RANSAC_THRESHOLD = 5.0  # Inlier threshold in pixels (relaxed for simple descriptors)
-    MIN_INLIERS = 20  # Minimum number of inliers required (relaxed)
+    MIN_INLIERS = 10  # Minimum number of inliers required (relaxed)
 
     # ==================== Phase 4: Camera Pose Estimation ====================
     # Essential Matrix
@@ -71,17 +71,17 @@ class Config:
 
     # ==================== Phase 5: Triangulation ====================
     # Triangulation Quality
-    REPROJ_ERROR_THRESHOLD = 10.0  # Reprojection error threshold in pixels (relaxed for robustness)
-    MIN_PARALLAX_ANGLE = 0.5  # Minimum parallax angle in degrees (relaxed)
-    MIN_DEPTH = 0.01  # Minimum depth for valid points (very permissive)
+    REPROJ_ERROR_THRESHOLD = 100.0  # Reprojection error threshold in pixels (relaxed for robustness)
+    MIN_PARALLAX_ANGLE = 0.01  # Minimum parallax angle in degrees (relaxed)
+    MIN_DEPTH = 0.1  # Minimum depth for valid points (very permissive)
     MAX_DEPTH = 10000.0  # Maximum depth for valid points (very permissive)
 
     # ==================== Phase 6: Incremental Reconstruction ====================
     # PnP RANSAC
     PNP_RANSAC_ITERATIONS = 2000  # Number of RANSAC iterations for PnP (increased)
-    PNP_RANSAC_THRESHOLD = 8.0  # Inlier threshold in pixels for PnP (relaxed)
+    PNP_RANSAC_THRESHOLD = 50.0  # Inlier threshold in pixels for PnP (relaxed)
     MIN_PNP_POINTS = 6  # Minimum number of 2D-3D correspondences for PnP
-    MIN_PNP_INLIERS = 20  # Minimum number of inliers for successful PnP (relaxed)
+    MIN_PNP_INLIERS = 5  # Minimum number of inliers for successful PnP (relaxed)
 
     # Next Image Selection
     MIN_2D3D_MATCHES = 15  # Minimum 2D-3D matches to add new image (relaxed)
