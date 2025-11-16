@@ -39,9 +39,9 @@ class Config:
 
     # ==================== Phase 3: Feature Matching ====================
     # Descriptor Matching
-    RATIO_TEST_THRESHOLD = 0.8  # Lowe's ratio test threshold
-    USE_SYMMETRIC_MATCHING = True  # Use symmetric matching for better quality
-    MIN_MATCHES = 50  # Minimum number of matches required
+    RATIO_TEST_THRESHOLD = 0.99  # Lowe's ratio test threshold (very relaxed for simple patch descriptors)
+    USE_SYMMETRIC_MATCHING = False  # Disabled for simple descriptors to get more matches
+    MIN_MATCHES = 20  # Minimum number of matches required (lowered for simple descriptors)
 
     # RANSAC for Fundamental Matrix
     RANSAC_ITERATIONS = 2000  # Number of RANSAC iterations

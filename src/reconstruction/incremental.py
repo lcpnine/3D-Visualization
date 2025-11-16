@@ -84,6 +84,15 @@ class IncrementalSfM:
             print(f"Extracted {total_features} features total")
             print(f"Average per image: {total_features / self.n_images:.1f}")
 
+            # Diagnostic: Check descriptor statistics for first image
+            if len(self.all_descriptors) > 0 and len(self.all_descriptors[0]) > 0:
+                desc_sample = self.all_descriptors[0]
+                desc_norms = np.linalg.norm(desc_sample, axis=1)
+                print(f"  Descriptor diagnostics (image 0):")
+                print(f"    Shape: {desc_sample.shape}")
+                print(f"    L2 norms - mean: {desc_norms.mean():.4f}, std: {desc_norms.std():.4f}")
+                print(f"    Values - mean: {desc_sample.mean():.4f}, std: {desc_sample.std():.4f}")
+
         if self.enable_debug and self.verbose:
             print(f"  Debug: Feature visualizations saved to {self.debug_viz.output_dir}")
 
@@ -108,21 +117,44 @@ class IncrementalSfM:
         if self.verbose:
             print(f"Matching {len(pairs_to_match)} image pairs...")
 
+        # Diagnostic counters
+        total_raw_matches = 0
+        pairs_with_any_matches = 0
+
         for i, j in pairs_to_match:
             desc1 = self.all_descriptors[i]
             desc2 = self.all_descriptors[j]
 
-            matches, _ = matcher.match_descriptors(desc1, desc2)
+            # Check if descriptors are valid
+            if len(desc1) == 0 or len(desc2) == 0:
+                if self.verbose and (i, j) in [(0, 1), (1, 2)]:
+                    print(f"  Pair ({i}, {j}): Empty descriptors (desc1={len(desc1)}, desc2={len(desc2)})")
+                continue
+
+            # Enable debug output for first pair
+            debug_this_pair = self.verbose and (i, j) == (0, 1)
+            if debug_this_pair:
+                print(f"  Debugging pair ({i}, {j}):")
+
+            matches, _ = matcher.match_descriptors(desc1, desc2, debug=debug_this_pair)
+
+            # Diagnostic output for first few pairs
+            if self.verbose and (i, j) in [(0, 1), (1, 2), (0, 2)]:
+                print(f"  Pair ({i}, {j}): {len(matches)} matches (desc1={len(desc1)}, desc2={len(desc2)})")
+
+            if len(matches) > 0:
+                pairs_with_any_matches += 1
+                total_raw_matches += len(matches)
 
             if len(matches) >= cfg.MIN_MATCHES:
                 self.pairwise_matches[(i, j)] = matches
 
-                if self.verbose and (i, j) == (0, 1):
-                    print(f"  Pair ({i}, {j}): {len(matches)} matches")
-
         if self.verbose:
             valid_pairs = len(self.pairwise_matches)
             print(f"Found matches for {valid_pairs}/{len(pairs_to_match)} pairs")
+            print(f"  Pairs with any matches: {pairs_with_any_matches}")
+            print(f"  Total raw matches: {total_raw_matches}")
+            print(f"  MIN_MATCHES threshold: {cfg.MIN_MATCHES}")
 
         if self.enable_debug and self.verbose:
             print(f"  Debug: Match visualizations saved to {self.debug_viz.output_dir}")
