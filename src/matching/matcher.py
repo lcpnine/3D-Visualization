@@ -10,7 +10,8 @@ from config import cfg
 
 def match_descriptors(desc1: np.ndarray, desc2: np.ndarray,
                      ratio_threshold: float = None,
-                     use_symmetric: bool = None) -> Tuple[np.ndarray, np.ndarray]:
+                     use_symmetric: bool = None,
+                     debug: bool = False) -> Tuple[np.ndarray, np.ndarray]:
     """
     Match descriptors between two images using brute-force matching with ratio test
 
@@ -19,6 +20,7 @@ def match_descriptors(desc1: np.ndarray, desc2: np.ndarray,
         desc2: Descriptors from image 2 (N2, D)
         ratio_threshold: Lowe's ratio test threshold (default: from config)
         use_symmetric: Use symmetric matching (default: from config)
+        debug: Print debug information (default: False)
 
     Returns:
         matches: Array of matches (M, 2) where each row is [idx1, idx2]
@@ -32,17 +34,30 @@ def match_descriptors(desc1: np.ndarray, desc2: np.ndarray,
     # Compute distance matrix
     dist_matrix = compute_distance_matrix(desc1, desc2)
 
+    if debug:
+        print(f"    Distance matrix shape: {dist_matrix.shape}")
+        print(f"    Distance stats - min: {dist_matrix.min():.4f}, max: {dist_matrix.max():.4f}, mean: {dist_matrix.mean():.4f}")
+
     # Forward matching (image 1 to image 2)
-    matches_12, distances_12 = match_with_ratio_test(dist_matrix, ratio_threshold)
+    matches_12, distances_12 = match_with_ratio_test(dist_matrix, ratio_threshold, debug=debug)
+
+    if debug:
+        print(f"    Forward matches: {len(matches_12)}")
 
     if use_symmetric:
         # Backward matching (image 2 to image 1)
         dist_matrix_T = dist_matrix.T
-        matches_21, distances_21 = match_with_ratio_test(dist_matrix_T, ratio_threshold)
+        matches_21, distances_21 = match_with_ratio_test(dist_matrix_T, ratio_threshold, debug=False)
+
+        if debug:
+            print(f"    Backward matches: {len(matches_21)}")
 
         # Keep only symmetric matches
         matches, distances = symmetric_matching(matches_12, distances_12,
                                                matches_21, distances_21)
+
+        if debug:
+            print(f"    Symmetric matches: {len(matches)}")
     else:
         matches = matches_12
         distances = distances_12
@@ -84,7 +99,8 @@ def compute_distance_matrix(desc1: np.ndarray, desc2: np.ndarray) -> np.ndarray:
 
 
 def match_with_ratio_test(dist_matrix: np.ndarray,
-                          ratio_threshold: float = 0.8) -> Tuple[np.ndarray, np.ndarray]:
+                          ratio_threshold: float = 0.8,
+                          debug: bool = False) -> Tuple[np.ndarray, np.ndarray]:
     """
     Perform matching with Lowe's ratio test
 
@@ -95,6 +111,7 @@ def match_with_ratio_test(dist_matrix: np.ndarray,
     Args:
         dist_matrix: Distance matrix (N1, N2)
         ratio_threshold: Ratio test threshold (typically 0.75-0.8)
+        debug: Print debug information (default: False)
 
     Returns:
         matches: Array of matches (M, 2) where each row is [idx1, idx2]
@@ -120,6 +137,10 @@ def match_with_ratio_test(dist_matrix: np.ndarray,
     # Ratio test
     ratios = nn1_distances / (nn2_distances + 1e-10)  # Add small epsilon to avoid division by zero
     valid_mask = ratios < ratio_threshold
+
+    if debug:
+        print(f"    Ratio test stats - min: {ratios.min():.4f}, max: {ratios.max():.4f}, mean: {ratios.mean():.4f}")
+        print(f"    Passed ratio test: {valid_mask.sum()}/{len(valid_mask)} ({100*valid_mask.sum()/len(valid_mask):.1f}%)")
 
     # Extract valid matches
     idx1 = np.where(valid_mask)[0]
