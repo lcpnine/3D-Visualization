@@ -132,17 +132,16 @@ def filter_triangulated_points(points_3d: np.ndarray,
     valid_mask &= (total_errors < reproj_threshold)
 
     # Filter by depth (positive depth in both cameras)
+    # For camera 1 (assumed to be world frame): depth is Z coordinate
     depths1 = points_3d[:, 2]
     valid_mask &= (depths1 > min_depth) & (depths1 < max_depth)
 
-    # For camera 2, transform points and check depth
-    # Extract R and t from P2 = K[R|t]
-    # This is approximate - in practice we'd pass R, t explicitly
-    depths2_positive = np.ones(N, dtype=bool)  # Simplified check
-    # In full implementation, would transform points to camera 2 frame
-
-    # Filter by parallax angle (optional, requires camera centers)
-    # Skipped for now as it requires extracting camera centers from P1, P2
+    # For camera 2, check depth using projection matrix
+    # Project points and check if they're in front of camera (positive Z after projection)
+    X_h = np.hstack([points_3d, np.ones((N, 1))])  # Homogeneous coordinates
+    projected = (P2 @ X_h.T).T  # (N, 3)
+    depths2 = projected[:, 2]  # Z coordinate in camera 2 frame (before perspective division)
+    valid_mask &= (depths2 > 0)  # Must be in front of camera 2
 
     filtered_points = points_3d[valid_mask]
 

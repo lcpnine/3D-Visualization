@@ -34,19 +34,19 @@ class Config:
     EDGE_CORNERS_MAX = 1000  # Maximum edge-based corners to extract
 
     # Feature Descriptor
-    PATCH_SIZE = 8  # Patch size for descriptor (8x8 = 64 dimensions)
+    PATCH_SIZE = 11  # Patch size for descriptor (11x11 = 121 dimensions, balanced)
     DESCRIPTOR_BORDER = 10  # Border pixels to exclude from descriptor extraction
 
     # ==================== Phase 3: Feature Matching ====================
     # Descriptor Matching
-    RATIO_TEST_THRESHOLD = 0.99  # Lowe's ratio test threshold (very relaxed for simple patch descriptors)
+    RATIO_TEST_THRESHOLD = 0.95  # Lowe's ratio test threshold (relaxed but not too much)
     USE_SYMMETRIC_MATCHING = False  # Disabled for simple descriptors to get more matches
     MIN_MATCHES = 20  # Minimum number of matches required (lowered for simple descriptors)
 
     # RANSAC for Fundamental Matrix
-    RANSAC_ITERATIONS = 2000  # Number of RANSAC iterations
-    RANSAC_THRESHOLD = 3.0  # Inlier threshold in pixels (Sampson distance)
-    MIN_INLIERS = 30  # Minimum number of inliers required
+    RANSAC_ITERATIONS = 5000  # Number of RANSAC iterations (increased for better convergence)
+    RANSAC_THRESHOLD = 5.0  # Inlier threshold in pixels (relaxed for simple descriptors)
+    MIN_INLIERS = 20  # Minimum number of inliers required (relaxed)
 
     # ==================== Phase 4: Camera Pose Estimation ====================
     # Essential Matrix
@@ -54,20 +54,20 @@ class Config:
 
     # ==================== Phase 5: Triangulation ====================
     # Triangulation Quality
-    REPROJ_ERROR_THRESHOLD = 5.0  # Reprojection error threshold in pixels
-    MIN_PARALLAX_ANGLE = 1.0  # Minimum parallax angle in degrees
-    MIN_DEPTH = 0.1  # Minimum depth for valid points
-    MAX_DEPTH = 1000.0  # Maximum depth for valid points
+    REPROJ_ERROR_THRESHOLD = 10.0  # Reprojection error threshold in pixels (relaxed for robustness)
+    MIN_PARALLAX_ANGLE = 0.5  # Minimum parallax angle in degrees (relaxed)
+    MIN_DEPTH = 0.01  # Minimum depth for valid points (very permissive)
+    MAX_DEPTH = 10000.0  # Maximum depth for valid points (very permissive)
 
     # ==================== Phase 6: Incremental Reconstruction ====================
     # PnP RANSAC
-    PNP_RANSAC_ITERATIONS = 1000  # Number of RANSAC iterations for PnP
-    PNP_RANSAC_THRESHOLD = 5.0  # Inlier threshold in pixels for PnP
+    PNP_RANSAC_ITERATIONS = 2000  # Number of RANSAC iterations for PnP (increased)
+    PNP_RANSAC_THRESHOLD = 8.0  # Inlier threshold in pixels for PnP (relaxed)
     MIN_PNP_POINTS = 6  # Minimum number of 2D-3D correspondences for PnP
-    MIN_PNP_INLIERS = 30  # Minimum number of inliers for successful PnP
+    MIN_PNP_INLIERS = 20  # Minimum number of inliers for successful PnP (relaxed)
 
     # Next Image Selection
-    MIN_2D3D_MATCHES = 30  # Minimum 2D-3D matches to add new image
+    MIN_2D3D_MATCHES = 15  # Minimum 2D-3D matches to add new image (relaxed)
 
     # ==================== Phase 7: Bundle Adjustment ====================
     # Optimization

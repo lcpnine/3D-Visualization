@@ -221,6 +221,11 @@ class IncrementalSfM:
         inlier_pts1 = pts1[inlier_mask]
         inlier_pts2 = pts2[inlier_mask]
 
+        if self.verbose:
+            print(f"Inlier point coordinates (pixels):")
+            print(f"  Image 1: x range [{inlier_pts1[:, 0].min():.1f}, {inlier_pts1[:, 0].max():.1f}], y range [{inlier_pts1[:, 1].min():.1f}, {inlier_pts1[:, 1].max():.1f}]")
+            print(f"  Image 2: x range [{inlier_pts2[:, 0].min():.1f}, {inlier_pts2[:, 0].max():.1f}], y range [{inlier_pts2[:, 1].min():.1f}, {inlier_pts2[:, 1].max():.1f}]")
+
         R, t = pose_recovery.select_valid_pose(poses, inlier_pts1, inlier_pts2, self.K)
 
         # Debug: Visualize matches with inliers/outliers
@@ -234,13 +239,48 @@ class IncrementalSfM:
         P1 = self.K @ np.hstack([np.eye(3), np.zeros((3, 1))])
         P2 = self.K @ np.hstack([R, t.reshape(3, 1)])
 
+        if self.verbose:
+            print(f"Camera matrices:")
+            print(f"  K (intrinsics): focal length = {self.K[0,0]:.2f}, principal point = ({self.K[0,2]:.2f}, {self.K[1,2]:.2f})")
+            print(f"  P1 shape: {P1.shape}, P2 shape: {P2.shape}")
+
         # Triangulate points
         points_3d = triangulate.triangulate_points(P1, P2, inlier_pts1, inlier_pts2)
+
+        # Sanity check: manually project first 3D point
+        if self.verbose and len(points_3d) > 0:
+            X_test = np.append(points_3d[0], 1)  # Homogeneous
+            proj1 = P1 @ X_test
+            proj2 = P2 @ X_test
+            proj1_2d = proj1[:2] / proj1[2]
+            proj2_2d = proj2[:2] / proj2[2]
+            print(f"  Sanity check (first point):")
+            print(f"    3D point: {points_3d[0]}")
+            print(f"    Original 2D (img1): {inlier_pts1[0]}, Projected: {proj1_2d}, Error: {np.linalg.norm(proj1_2d - inlier_pts1[0]):.2f} px")
+            print(f"    Original 2D (img2): {inlier_pts2[0]}, Projected: {proj2_2d}, Error: {np.linalg.norm(proj2_2d - inlier_pts2[0]):.2f} px")
+
+        if self.verbose:
+            print(f"Triangulated {len(points_3d)} points before filtering")
 
         # Filter points
         filtered_points, valid_mask = validation.filter_triangulated_points(
             points_3d, P1, P2, inlier_pts1, inlier_pts2
         )
+
+        if self.verbose:
+            # Debug filtering
+            errors1 = validation.compute_all_reprojection_errors(points_3d, P1, inlier_pts1)
+            errors2 = validation.compute_all_reprojection_errors(points_3d, P2, inlier_pts2)
+            total_errors = errors1 + errors2
+
+            print(f"  Reprojection errors: min={total_errors.min():.2f}, max={total_errors.max():.2f}, mean={total_errors.mean():.2f}")
+            print(f"  Points passing reproj filter: {np.sum(total_errors < cfg.REPROJ_ERROR_THRESHOLD)}/{len(points_3d)}")
+
+            depths1 = points_3d[:, 2]
+            print(f"  Depths (cam1): min={depths1.min():.2f}, max={depths1.max():.2f}, mean={depths1.mean():.2f}")
+            print(f"  Points passing depth filter (cam1): {np.sum((depths1 > cfg.MIN_DEPTH) & (depths1 < cfg.MAX_DEPTH))}/{len(points_3d)}")
+
+            print(f"  Final: {len(filtered_points)}/{len(points_3d)} points passed all filters")
 
         # Debug: Visualize reprojection errors for both cameras
         if self.enable_debug:
