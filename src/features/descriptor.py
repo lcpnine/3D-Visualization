@@ -51,10 +51,14 @@ def compute_descriptors(image: np.ndarray, keypoints: np.ndarray,
     descriptors = []
     total_kps = len(valid_keypoints)
 
+    # Show initial count if verbose
+    if verbose and total_kps > 0:
+        print(f" (0/{total_kps})", end='', flush=True)
+
     for i, kp in enumerate(valid_keypoints):
-        # Show progress for large sets of keypoints
+        # Show progress for sets of keypoints
         if verbose and total_kps >= progress_interval and (i + 1) % progress_interval == 0:
-            print(f" [{i+1}/{total_kps} descriptors]", end='', flush=True)
+            print(f" ({i+1}/{total_kps})", end='', flush=True)
 
         x, y = kp
         patch = extract_patch(image, x, y, patch_size)

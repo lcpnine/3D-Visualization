@@ -70,7 +70,7 @@ class IncrementalSfM:
 
         for i, img in enumerate(self.images):
             if self.verbose:
-                print(f"  Processing image {i+1}/{self.n_images}...", end='', flush=True)
+                print(f"  Processing image {i+1}/{self.n_images}...")
 
             img_start_time = time.time()
 
@@ -79,9 +79,13 @@ class IncrementalSfM:
             corners = harris_detector.detect_harris_corners(img)
             corner_time = time.time() - corner_start
 
+            if self.verbose:
+                print(f"    Detected {len(corners)} corners ({corner_time:.2f}s)", flush=True)
+                print(f"    Computing descriptors...", end='', flush=True)
+
             # Compute descriptors (with progress)
             desc_start = time.time()
-            desc = descriptor.compute_descriptors(img, corners, verbose=self.verbose)
+            desc = descriptor.compute_descriptors(img, corners, verbose=self.verbose, progress_interval=100)
             desc_time = time.time() - desc_start
 
             img_time = time.time() - img_start_time
@@ -90,7 +94,8 @@ class IncrementalSfM:
             self.all_descriptors.append(desc)
 
             if self.verbose:
-                print(f" Done! ({img_time:.2f}s: corners {corner_time:.2f}s, descriptors {desc_time:.2f}s, {len(corners)} keypoints → {len(desc)} descriptors)")
+                print(f" Done! ({desc_time:.2f}s, {len(desc)} descriptors)")
+                print(f"    Total time for image: {img_time:.2f}s")
 
             # Debug: Visualize features
             if self.enable_debug:
