@@ -20,10 +20,10 @@ class Config:
     HARRIS_SIGMA = 1.5  # Gaussian sigma for structure tensor
     NMS_WINDOW_SIZE = 5  # Non-maximum suppression window size
     TARGET_CORNERS_MIN = 500  # Minimum number of corners per image
-    TARGET_CORNERS_MAX = 5000  # Maximum number of corners per image (increased from 2000)
+    TARGET_CORNERS_MAX = 1000  # Maximum number of corners per image (optimized for speed)
 
     # Enhanced Detection Methods
-    USE_MULTISCALE_DETECTION = True  # Enable multi-scale detection (detects both fine and coarse features)
+    USE_MULTISCALE_DETECTION = False  # Enable multi-scale detection (disabled for speed)
     USE_ADAPTIVE_THRESHOLD = True  # Enable adaptive thresholding (more robust than max-based threshold)
 
     # Canny Edge Detection (for detecting object outlines like bottle bodies)
