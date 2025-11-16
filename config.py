@@ -13,7 +13,11 @@ class Config:
     DEFAULT_FOV = 60.0  # Field of View in degrees (typical for smartphones)
 
     # ==================== Phase 2: Feature Detection ====================
-    # Harris Corner Detection
+    # Feature Detector Selection
+    FEATURE_DETECTOR = 'sift'  # Options: 'harris', 'sift', 'orb'
+    TARGET_FEATURES = 2000  # Target number of features to extract per image
+
+    # Harris Corner Detection (used when FEATURE_DETECTOR='harris')
     HARRIS_K = 0.04  # Harris corner response parameter (lower = more corners)
     HARRIS_THRESHOLD = 0.005  # Corner response threshold (lowered from 0.01 for better detection)
     HARRIS_WINDOW_SIZE = 5  # Window size for structure tensor
@@ -25,6 +29,19 @@ class Config:
     # Enhanced Detection Methods
     USE_MULTISCALE_DETECTION = False  # Enable multi-scale detection (disabled for speed)
     USE_ADAPTIVE_THRESHOLD = True  # Enable adaptive thresholding (more robust than max-based threshold)
+
+    # SIFT Parameters (used when FEATURE_DETECTOR='sift')
+    SIFT_N_OCTAVES = 4  # Number of octaves in scale space
+    SIFT_CONTRAST_THRESHOLD = 0.04  # Contrast threshold for filtering weak features
+    SIFT_EDGE_THRESHOLD = 10  # Edge threshold for filtering edge responses
+    SIFT_SIGMA = 1.6  # Gaussian sigma for scale space
+
+    # ORB Parameters (used when FEATURE_DETECTOR='orb')
+    ORB_N_KEYPOINTS = 2000  # Maximum number of keypoints to retain
+    ORB_SCALE_FACTOR = 1.2  # Pyramid decimation ratio
+    ORB_N_LEVELS = 8  # Number of pyramid levels
+    ORB_EDGE_THRESHOLD = 31  # Size of border where features are not detected
+    ORB_FAST_THRESHOLD = 20  # FAST detector threshold
 
     # Canny Edge Detection (for detecting object outlines like bottle bodies)
     CANNY_SIGMA = 1.4  # Gaussian sigma for Canny edge detection

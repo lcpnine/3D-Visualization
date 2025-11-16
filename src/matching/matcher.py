@@ -11,7 +11,8 @@ from config import cfg
 def match_descriptors(desc1: np.ndarray, desc2: np.ndarray,
                      ratio_threshold: float = None,
                      use_symmetric: bool = None,
-                     debug: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+                     debug: bool = False,
+                     descriptor_type: str = 'float') -> Tuple[np.ndarray, np.ndarray]:
     """
     Match descriptors between two images using brute-force matching with ratio test
 
@@ -21,6 +22,7 @@ def match_descriptors(desc1: np.ndarray, desc2: np.ndarray,
         ratio_threshold: Lowe's ratio test threshold (default: from config)
         use_symmetric: Use symmetric matching (default: from config)
         debug: Print debug information (default: False)
+        descriptor_type: Type of descriptors ('float' for L2, 'binary' for Hamming)
 
     Returns:
         matches: Array of matches (M, 2) where each row is [idx1, idx2]
@@ -32,7 +34,7 @@ def match_descriptors(desc1: np.ndarray, desc2: np.ndarray,
         use_symmetric = cfg.USE_SYMMETRIC_MATCHING
 
     # Compute distance matrix
-    dist_matrix = compute_distance_matrix(desc1, desc2)
+    dist_matrix = compute_distance_matrix(desc1, desc2, descriptor_type)
 
     if debug:
         print(f"    Distance matrix shape: {dist_matrix.shape}")
@@ -65,37 +67,58 @@ def match_descriptors(desc1: np.ndarray, desc2: np.ndarray,
     return matches, distances
 
 
-def compute_distance_matrix(desc1: np.ndarray, desc2: np.ndarray) -> np.ndarray:
+def compute_distance_matrix(desc1: np.ndarray, desc2: np.ndarray,
+                           descriptor_type: str = 'float') -> np.ndarray:
     """
-    Compute pairwise Euclidean distance matrix between descriptors
+    Compute pairwise distance matrix between descriptors
 
-    Efficient computation using:
-    ||a - b||² = ||a||² + ||b||² - 2*a·b
+    For float descriptors: Euclidean distance
+    For binary descriptors: Hamming distance
 
     Args:
         desc1: Descriptors from image 1 (N1, D)
         desc2: Descriptors from image 2 (N2, D)
+        descriptor_type: Type of descriptors ('float' or 'binary')
 
     Returns:
         dist_matrix: Distance matrix (N1, N2)
     """
-    # Compute squared norms
-    norm1_sq = np.sum(desc1 ** 2, axis=1, keepdims=True)  # (N1, 1)
-    norm2_sq = np.sum(desc2 ** 2, axis=1, keepdims=True)  # (N2, 1)
+    if descriptor_type == 'binary':
+        # Hamming distance for binary descriptors
+        # Unpack bits and count differences
+        N1, N2 = len(desc1), len(desc2)
+        dist_matrix = np.zeros((N1, N2), dtype=np.float32)
 
-    # Compute dot products
-    dot_products = desc1 @ desc2.T  # (N1, N2)
+        # Efficient Hamming distance computation using XOR and popcount
+        for i in range(N1):
+            # XOR to find differing bits
+            xor_result = np.bitwise_xor(desc1[i:i+1], desc2)
+            # Count set bits in each byte
+            dist_matrix[i] = np.unpackbits(xor_result, axis=1).sum(axis=1)
 
-    # Compute squared distances
-    dist_sq = norm1_sq + norm2_sq.T - 2 * dot_products
+        return dist_matrix
 
-    # Ensure non-negative (numerical stability)
-    dist_sq = np.maximum(dist_sq, 0)
+    else:
+        # Euclidean distance for float descriptors
+        # Efficient computation using: ||a - b||² = ||a||² + ||b||² - 2*a·b
 
-    # Take square root to get Euclidean distance
-    dist_matrix = np.sqrt(dist_sq)
+        # Compute squared norms
+        norm1_sq = np.sum(desc1 ** 2, axis=1, keepdims=True)  # (N1, 1)
+        norm2_sq = np.sum(desc2 ** 2, axis=1, keepdims=True)  # (N2, 1)
 
-    return dist_matrix.astype(np.float32)
+        # Compute dot products
+        dot_products = desc1 @ desc2.T  # (N1, N2)
+
+        # Compute squared distances
+        dist_sq = norm1_sq + norm2_sq.T - 2 * dot_products
+
+        # Ensure non-negative (numerical stability)
+        dist_sq = np.maximum(dist_sq, 0)
+
+        # Take square root to get Euclidean distance
+        dist_matrix = np.sqrt(dist_sq)
+
+        return dist_matrix.astype(np.float32)
 
 
 def match_with_ratio_test(dist_matrix: np.ndarray,
