@@ -1,12 +1,15 @@
 """
 Feature detector factory for selecting and creating different feature detectors
+Uses OpenCV implementations for better performance and reliability
 """
 
 import numpy as np
-from .harris_detector import detect_harris_corners
-from .sift_detector import detect_sift_features
-from .orb_detector import detect_orb_features
-from .descriptor import compute_descriptors
+from .opencv_detector import (
+    detect_harris_corners,
+    detect_sift_features,
+    detect_orb_features,
+    compute_descriptors
+)
 from config import cfg
 
 
