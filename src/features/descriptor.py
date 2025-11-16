@@ -4,6 +4,7 @@ Generates feature descriptors for detected keypoints using normalized patches.
 """
 
 import numpy as np
+from scipy.ndimage import map_coordinates
 from config import cfg
 
 
@@ -71,22 +72,26 @@ def extract_patch(image: np.ndarray, x: float, y: float, size: int) -> np.ndarra
     """
     half_size = size // 2
 
-    # Create patch coordinate grid
+    # Create patch coordinate grid (vectorized)
     patch_x = np.arange(size) - half_size
     patch_y = np.arange(size) - half_size
 
+    # Create 2D meshgrid
+    grid_x, grid_y = np.meshgrid(patch_x, patch_y)
+
     # Map to image coordinates
-    img_x = x + patch_x
-    img_y = y + patch_y
+    img_x = x + grid_x
+    img_y = y + grid_y
 
-    # Sample using bilinear interpolation
-    patch = np.zeros((size, size), dtype=np.float32)
+    # Use scipy's map_coordinates for fast bilinear interpolation
+    # map_coordinates expects (row, col) which is (y, x)
+    coordinates = np.array([img_y.flatten(), img_x.flatten()])
 
-    for i in range(size):
-        for j in range(size):
-            px = img_x[j]
-            py = img_y[i]
-            patch[i, j] = bilinear_sample(image, px, py)
+    # Sample using bilinear interpolation (order=1)
+    patch = map_coordinates(image, coordinates, order=1, mode='constant', cval=0.0)
+
+    # Reshape back to 2D patch
+    patch = patch.reshape(size, size).astype(np.float32)
 
     return patch
 
