@@ -3,10 +3,11 @@ Phase 8 - Step 8.3: Visualization
 Visualizes reconstruction results.
 """
 
-import numpy as np
+from typing import Dict, List
+
 import matplotlib.pyplot as plt
+import numpy as np
 from mpl_toolkits.mplot3d import Axes3D
-from typing import List, Dict
 
 
 def visualize_point_cloud(points: np.ndarray, colors: np.ndarray = None,
@@ -20,6 +21,10 @@ def visualize_point_cloud(points: np.ndarray, colors: np.ndarray = None,
         save_path: Path to save figure, optional
         title: Plot title
     """
+    if len(points) == 0:
+        print("Warning: No points to visualize")
+        return
+        
     fig = plt.figure(figsize=(12, 10))
     ax = fig.add_subplot(111, projection='3d')
 
