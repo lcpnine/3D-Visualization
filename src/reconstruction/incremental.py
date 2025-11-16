@@ -6,6 +6,7 @@ Incrementally reconstructs 3D structure by adding images one at a time.
 import numpy as np
 from typing import List, Dict, Tuple, Optional
 import sys
+import time
 sys.path.insert(0, '.')
 
 from config import cfg
@@ -65,22 +66,41 @@ class IncrementalSfM:
             print("Extracting features from all images...")
             print("-" * 70)
 
-        for i, img in enumerate(self.images):
-            if self.verbose and i % 5 == 0:
-                print(f"  Processing image {i+1}/{self.n_images}...")
+        total_start_time = time.time()
 
+        for i, img in enumerate(self.images):
+            if self.verbose:
+                print(f"  Processing image {i+1}/{self.n_images}...", end='', flush=True)
+
+            img_start_time = time.time()
+
+            # Detect corners
+            corner_start = time.time()
             corners = harris_detector.detect_harris_corners(img)
-            desc = descriptor.compute_descriptors(img, corners)
+            corner_time = time.time() - corner_start
+
+            # Compute descriptors (with progress)
+            desc_start = time.time()
+            desc = descriptor.compute_descriptors(img, corners, verbose=self.verbose)
+            desc_time = time.time() - desc_start
+
+            img_time = time.time() - img_start_time
 
             self.all_keypoints.append(corners)
             self.all_descriptors.append(desc)
+
+            if self.verbose:
+                print(f" Done! ({img_time:.2f}s: corners {corner_time:.2f}s, descriptors {desc_time:.2f}s, {len(corners)} keypoints → {len(desc)} descriptors)")
 
             # Debug: Visualize features
             if self.enable_debug:
                 self.debug_viz.visualize_features(img, corners, i)
 
+        total_time = time.time() - total_start_time
+
         if self.verbose:
             total_features = sum(len(d) for d in self.all_descriptors)
+            print(f"\nTotal extraction time: {total_time:.2f}s")
             print(f"Extracted {total_features} features total")
             print(f"Average per image: {total_features / self.n_images:.1f}")
 

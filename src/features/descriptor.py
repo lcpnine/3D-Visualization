@@ -9,7 +9,8 @@ from config import cfg
 
 
 def compute_descriptors(image: np.ndarray, keypoints: np.ndarray,
-                       patch_size: int = None, border: int = None) -> np.ndarray:
+                       patch_size: int = None, border: int = None,
+                       verbose: bool = False, progress_interval: int = 500) -> np.ndarray:
     """
     Compute descriptors for keypoints using normalized patches
 
@@ -18,6 +19,8 @@ def compute_descriptors(image: np.ndarray, keypoints: np.ndarray,
         keypoints: Keypoint coordinates (N, 2) as (x, y)
         patch_size: Patch size (default: from config)
         border: Border pixels to exclude (default: from config)
+        verbose: Show progress during computation
+        progress_interval: Show progress every N keypoints
 
     Returns:
         descriptors: Descriptor matrix (M, patch_size²) where M <= N
@@ -46,7 +49,13 @@ def compute_descriptors(image: np.ndarray, keypoints: np.ndarray,
 
     # Extract and normalize descriptors
     descriptors = []
-    for kp in valid_keypoints:
+    total_kps = len(valid_keypoints)
+
+    for i, kp in enumerate(valid_keypoints):
+        # Show progress for large sets of keypoints
+        if verbose and total_kps >= progress_interval and (i + 1) % progress_interval == 0:
+            print(f" [{i+1}/{total_kps} descriptors]", end='', flush=True)
+
         x, y = kp
         patch = extract_patch(image, x, y, patch_size)
         desc = normalize_descriptor(patch)
