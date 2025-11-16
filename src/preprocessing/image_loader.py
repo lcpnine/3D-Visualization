@@ -14,7 +14,14 @@ try:
     HEIF_AVAILABLE = True
 except ImportError:
     HEIF_AVAILABLE = False
-    print("Warning: pillow_heif not available. HEIC support will be limited.")
+    print("\n" + "="*70)
+    print("WARNING: pillow_heif not installed - HEIC images cannot be loaded!")
+    print("="*70)
+    print("To fix this, install dependencies:")
+    print("  pip install -r requirements.txt")
+    print("or:")
+    print("  pip install pillow-heif")
+    print("="*70 + "\n")
 
 from config import cfg
 
@@ -87,7 +94,25 @@ def load_image(filepath: str) -> np.ndarray:
     Returns:
         RGB image as numpy array (height, width, 3) with values 0-255
     """
-    img = Image.open(filepath)
+    # Check if this is a HEIC file and the library is not available
+    if not HEIF_AVAILABLE and (filepath.lower().endswith('.heic') or filepath.lower().endswith('.heif')):
+        raise RuntimeError(
+            f"Cannot load HEIC image: {filepath}\n"
+            "pillow_heif is not installed. Install it with:\n"
+            "  pip install pillow-heif\n"
+            "or:\n"
+            "  pip install -r requirements.txt"
+        )
+
+    try:
+        img = Image.open(filepath)
+    except Exception as e:
+        raise RuntimeError(
+            f"Failed to load image: {filepath}\n"
+            f"Error: {str(e)}\n"
+            "If this is a HEIC file, make sure pillow_heif is installed:\n"
+            "  pip install pillow-heif"
+        )
 
     # Convert to RGB if needed (handles RGBA, L, etc.)
     if img.mode != 'RGB':

@@ -6,6 +6,71 @@ Reconstructs 3D point clouds from multi-view images without external computer vi
 
 ---
 
+## Quick Start
+
+### Prerequisites
+- Python 3.8 or higher
+- pip (Python package manager)
+
+### Installation
+
+1. **Clone the repository** (if you haven't already):
+```bash
+git clone <your-repo-url>
+cd 3D-Visualization
+```
+
+2. **Install dependencies**:
+```bash
+pip install -r requirements.txt
+```
+
+**Important**: This project requires `pillow-heif` for HEIC image support. If you skip this step, HEIC images cannot be loaded!
+
+3. **Verify installation**:
+```bash
+python verify_setup.py
+```
+
+This will check that all required dependencies are properly installed. You should see:
+```
+✓ All dependencies are installed correctly!
+```
+
+If you see any errors, especially for `pillow-heif`, run:
+```bash
+pip install pillow-heif
+```
+
+### Running the Pipeline
+
+```bash
+python main.py --image_dir data/scene1 --max_images 5
+```
+
+**Arguments**:
+- `--image_dir`: Path to directory containing HEIC images (required)
+- `--max_images`: Maximum number of images to process (optional, default: all)
+- `--output_dir`: Output directory for results (optional, default: output)
+
+### Troubleshooting
+
+**Error: "cannot identify image file ... .HEIC"**
+- This means `pillow-heif` is not installed
+- Solution: `pip install pillow-heif`
+- Verify with: `python verify_setup.py`
+
+**Error: "No images found"**
+- Check that your image directory exists
+- Make sure your images have `.HEIC` extension
+- The code looks for `*.HEIC` pattern by default
+
+**Import errors**
+- Make sure all dependencies are installed: `pip install -r requirements.txt`
+- Check Python version: `python --version` (should be 3.8+)
+
+---
+
 ## Phase 1: Image Preprocessing and Preparation
 
 ### Step 1.1: Image Loading and Normalization
