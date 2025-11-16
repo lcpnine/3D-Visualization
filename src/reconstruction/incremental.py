@@ -65,12 +65,25 @@ class IncrementalSfM:
             print("Extracting features from all images...")
             print("-" * 70)
 
+        import time
         for i, img in enumerate(self.images):
-            if self.verbose and i % 5 == 0:
-                print(f"  Processing image {i+1}/{self.n_images}...")
+            if self.verbose:
+                print(f"  Processing image {i+1}/{self.n_images}...", end='', flush=True)
+                t_start = time.time()
 
+            # Detect corners
             corners = harris_detector.detect_harris_corners(img)
+            if self.verbose:
+                t_corner = time.time() - t_start
+                print(f" corners: {len(corners)} ({t_corner:.1f}s)", end='', flush=True)
+
+            # Compute descriptors
+            t_desc_start = time.time()
             desc = descriptor.compute_descriptors(img, corners)
+            if self.verbose:
+                t_desc = time.time() - t_desc_start
+                t_total = time.time() - t_start
+                print(f", descriptors: {len(desc)} ({t_desc:.1f}s) [total: {t_total:.1f}s]")
 
             self.all_keypoints.append(corners)
             self.all_descriptors.append(desc)
