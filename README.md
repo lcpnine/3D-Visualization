@@ -12,7 +12,7 @@ Reconstructs 3D point clouds from multi-view images without external computer vi
 **Objective**: Load input images into memory and convert to processable format
 
 **Input**: 
-- Raw image files (JPEG/PNG)
+- Raw image files (HEIC)
 
 **Output**:
 - Normalized grayscale image arrays (0-1 range)

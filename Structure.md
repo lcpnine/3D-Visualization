@@ -12,8 +12,8 @@ sfm_project/
 │
 ├── data/                              # Input data
 │   ├── scene1/                        # Scene 1 images
-│   │   ├── img_001.jpg
-│   │   ├── img_002.jpg
+│   │   ├── IMG_2040.HEIC
+│   │   ├── IMG_2041.HEIC
 │   │   └── ...
 │   ├── scene2/                        # Scene 2 images (for generalization testing)
 │   └── camera_params.json             # Camera parameters (optional)
