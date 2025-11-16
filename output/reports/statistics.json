@@ -1,9 +1,9 @@
 {
-  "n_images": 3,
+  "n_images": 14,
   "n_cameras": 2,
   "n_points_raw": 20,
   "n_points_filtered": 20,
   "image_resolution": "4284x5712",
-  "focal_length": 3710.0528298125355,
-  "processing_time_seconds": 60.46659827232361
+  "focal_length": 3710.052829812536,
+  "processing_time_seconds": 175.36303091049194
 }
