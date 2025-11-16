@@ -12,6 +12,7 @@ sys.path.insert(0, '.')
 from config import cfg
 from src.preprocessing import camera_calibration
 from src.features import harris_detector, descriptor
+from src.features.feature_factory import detect_and_compute_features
 from src.matching import matcher, ransac
 from src.geometry import essential_matrix, pose_recovery
 from src.triangulation import triangulate, validation
@@ -53,6 +54,7 @@ class IncrementalSfM:
         # Feature data
         self.all_keypoints = []  # List of keypoint arrays for each image
         self.all_descriptors = []  # List of descriptor arrays
+        self.descriptor_type = None  # Type of descriptors: 'float' or 'binary'
         self.pairwise_matches = {}  # Dict[(i, j)] = (matches, inliers)
 
         # Reconstruction status
@@ -74,32 +76,28 @@ class IncrementalSfM:
 
             img_start_time = time.time()
 
-            # Detect corners
-            corner_start = time.time()
-            corners = harris_detector.detect_harris_corners(img)
-            corner_time = time.time() - corner_start
+            # Detect features and compute descriptors using factory
+            keypoints, descriptors, desc_type = detect_and_compute_features(img)
 
-            if self.verbose:
-                print(f"    Detected {len(corners)} corners ({corner_time:.2f}s)", flush=True)
-                print(f"    Computing descriptors...", end='', flush=True)
-
-            # Compute descriptors (with progress)
-            desc_start = time.time()
-            desc = descriptor.compute_descriptors(img, corners, verbose=self.verbose, progress_interval=100)
-            desc_time = time.time() - desc_start
+            # Store descriptor type (should be same for all images)
+            if self.descriptor_type is None:
+                self.descriptor_type = desc_type
+                if self.verbose:
+                    print(f"  Descriptor type: {desc_type}")
 
             img_time = time.time() - img_start_time
 
-            self.all_keypoints.append(corners)
-            self.all_descriptors.append(desc)
+            self.all_keypoints.append(keypoints)
+            self.all_descriptors.append(descriptors)
 
             if self.verbose:
-                print(f" Done! ({desc_time:.2f}s, {len(desc)} descriptors)")
+                print(f"    Detected {len(keypoints)} features")
+                print(f"    Computed {len(descriptors)} descriptors")
                 print(f"    Total time for image: {img_time:.2f}s")
 
             # Debug: Visualize features
             if self.enable_debug:
-                self.debug_viz.visualize_features(img, corners, i)
+                self.debug_viz.visualize_features(img, keypoints, i)
 
         total_time = time.time() - total_start_time
 
@@ -112,11 +110,20 @@ class IncrementalSfM:
             # Diagnostic: Check descriptor statistics for first image
             if len(self.all_descriptors) > 0 and len(self.all_descriptors[0]) > 0:
                 desc_sample = self.all_descriptors[0]
-                desc_norms = np.linalg.norm(desc_sample, axis=1)
                 print(f"  Descriptor diagnostics (image 0):")
                 print(f"    Shape: {desc_sample.shape}")
-                print(f"    L2 norms - mean: {desc_norms.mean():.4f}, std: {desc_norms.std():.4f}")
-                print(f"    Values - mean: {desc_sample.mean():.4f}, std: {desc_sample.std():.4f}")
+                print(f"    Type: {self.descriptor_type}")
+
+                if self.descriptor_type == 'float':
+                    desc_norms = np.linalg.norm(desc_sample, axis=1)
+                    print(f"    L2 norms - mean: {desc_norms.mean():.4f}, std: {desc_norms.std():.4f}")
+                    print(f"    Values - mean: {desc_sample.mean():.4f}, std: {desc_sample.std():.4f}")
+                elif self.descriptor_type == 'binary':
+                    # For binary descriptors, show bit statistics
+                    total_bits = desc_sample.shape[1] * 8
+                    bits_per_desc = np.unpackbits(desc_sample, axis=1).sum(axis=1)
+                    print(f"    Bits per descriptor: {total_bits}")
+                    print(f"    Set bits - mean: {bits_per_desc.mean():.1f}, std: {bits_per_desc.std():.1f}")
 
         if self.enable_debug and self.verbose:
             print(f"  Debug: Feature visualizations saved to {self.debug_viz.output_dir}")
@@ -161,7 +168,8 @@ class IncrementalSfM:
             if debug_this_pair:
                 print(f"  Debugging pair ({i}, {j}):")
 
-            matches, _ = matcher.match_descriptors(desc1, desc2, debug=debug_this_pair)
+            matches, _ = matcher.match_descriptors(desc1, desc2, debug=debug_this_pair,
+                                                   descriptor_type=self.descriptor_type)
 
             # Diagnostic output for first few pairs
             if self.verbose and (i, j) in [(0, 1), (1, 2), (0, 2)]:
