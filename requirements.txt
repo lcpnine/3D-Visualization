@@ -1,0 +1,13 @@
+# Core dependencies
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Image processing
+pillow>=10.0.0
+pillow-heif>=0.13.0
+
+# Visualization
+matplotlib>=3.7.0
+
+# Optional: for faster computation
+# numba>=0.57.0
