@@ -1,8 +1,8 @@
-# Structure from Motion (SfM) - Vanilla Implementation
+# Structure from Motion (SfM) - 3D Reconstruction
 
 ## Project Overview
-A pure Python/NumPy implementation of Structure from Motion system based on mathematical principles.
-Reconstructs 3D point clouds from multi-view images without external computer vision libraries (e.g., OpenCV).
+A Python implementation of Structure from Motion system based on mathematical principles.
+Reconstructs 3D point clouds from multi-view images using optimized OpenCV feature detectors (SIFT, ORB, Harris) for robust and efficient feature extraction.
 
 ---
 
@@ -122,17 +122,29 @@ K = [fx  0  cx]
 
 ## Phase 2: Feature Detection
 
-### Step 2.1: Harris Corner Detection
-**Objective**: Detect corner points in each image
+### Feature Detectors (OpenCV-based)
+**Objective**: Detect distinctive features in each image using industry-standard detectors
 
-**Input**:
-- Grayscale image I
+**Available Detectors**:
+1. **SIFT** (Scale-Invariant Feature Transform) - Default
+   - Scale and rotation invariant
+   - 128-dimensional float descriptors
+   - Best for general-purpose feature matching
+   - Optimized OpenCV implementation
 
-**Output**:
-- List of corner coordinates [(x1, y1), (x2, y2), ...]
-- Corner response values
+2. **ORB** (Oriented FAST and Rotated BRIEF)
+   - Fast binary descriptor-based detector
+   - 256-bit binary descriptors (32 bytes)
+   - Suitable for real-time applications
+   - Scale and rotation invariant
 
-**Mathematical Background**:
+3. **Harris Corner Detector**
+   - Fast corner detection
+   - 121-dimensional patch descriptors (11×11)
+   - Good for textured regions
+   - Adaptive thresholding support
+
+**Mathematical Background** (Harris):
 1. Image gradients:
    - `Ix = ∂I/∂x` (Sobel filter: [-1, 0, 1])
    - `Iy = ∂I/∂y` (Sobel filter: [-1, 0, 1]^T)
@@ -142,20 +154,17 @@ K = [fx  0  cx]
    M = [Σ(Ix²)    Σ(IxIy)]
        [Σ(IxIy)   Σ(Iy²) ]
    ```
-   (Σ is Gaussian weighted sum over local window)
 
 3. Corner response:
    - `R = det(M) - k*trace(M)²`  (k = 0.04-0.06)
-   - `det(M) = λ1*λ2`, `trace(M) = λ1 + λ2`
 
-4. Non-maximum suppression: Select only local maxima in 3x3 windows
+4. Non-maximum suppression: Select only local maxima
 
 **Implementation Details**:
-- Sobel kernel: `[[-1,0,1],[-2,0,2],[-1,0,1]]` implemented manually
-- Gaussian window: σ=1.5, 5x5 kernel
-- Threshold: R > 0.01 * max(R)
-- NMS window size: 3x3 or 5x5
-- Target per image: 500-2000 corners
+- Default detector: SIFT (config.FEATURE_DETECTOR)
+- Target features: 2000 per image
+- All detectors use optimized OpenCV implementations
+- Automatic descriptor type detection (float vs binary)
 
 ---
 

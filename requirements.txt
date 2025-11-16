@@ -5,6 +5,7 @@ scipy>=1.10.0
 # Image processing
 pillow>=10.0.0
 pillow-heif>=0.13.0
+opencv-contrib-python>=4.8.0  # Includes SIFT, ORB, and other feature detectors
 
 # Visualization
 matplotlib>=3.7.0
