@@ -10,9 +10,10 @@ from config import cfg
 
 def detect_harris_corners(image: np.ndarray, k: float = None, threshold: float = None,
                          window_size: int = None, sigma: float = None,
-                         nms_size: int = None, max_corners: int = None) -> np.ndarray:
+                         nms_size: int = None, max_corners: int = None,
+                         use_multiscale: bool = None, use_adaptive_threshold: bool = None) -> np.ndarray:
     """
-    Detect Harris corners in an image
+    Detect Harris corners in an image with enhanced multi-scale and adaptive thresholding
 
     Args:
         image: Grayscale image (H, W) with values 0-1
@@ -22,6 +23,8 @@ def detect_harris_corners(image: np.ndarray, k: float = None, threshold: float =
         sigma: Gaussian sigma for structure tensor (default: from config)
         nms_size: Non-maximum suppression window size (default: from config)
         max_corners: Maximum number of corners to return (default: from config)
+        use_multiscale: Enable multi-scale detection (default: from config)
+        use_adaptive_threshold: Enable adaptive thresholding (default: from config)
 
     Returns:
         corners: Array of corner coordinates (N, 2) as (x, y)
@@ -39,34 +42,48 @@ def detect_harris_corners(image: np.ndarray, k: float = None, threshold: float =
         nms_size = cfg.NMS_WINDOW_SIZE
     if max_corners is None:
         max_corners = cfg.TARGET_CORNERS_MAX
+    if use_multiscale is None:
+        use_multiscale = cfg.USE_MULTISCALE_DETECTION
+    if use_adaptive_threshold is None:
+        use_adaptive_threshold = cfg.USE_ADAPTIVE_THRESHOLD
 
-    # Step 1: Compute image gradients
-    Ix, Iy = compute_gradients(image)
+    if use_multiscale:
+        # Multi-scale detection: detects both fine details (labels) and coarse features (bottle outlines)
+        corners = detect_multiscale_corners(image, k, threshold, window_size, sigma,
+                                           nms_size, max_corners, use_adaptive_threshold)
+    else:
+        # Original single-scale detection
+        # Step 1: Compute image gradients
+        Ix, Iy = compute_gradients(image)
 
-    # Step 2: Compute structure tensor components
-    M = compute_structure_tensor(Ix, Iy, window_size, sigma)
+        # Step 2: Compute structure tensor components
+        M = compute_structure_tensor(Ix, Iy, window_size, sigma)
 
-    # Step 3: Compute corner response
-    R = corner_response(M, k)
+        # Step 3: Compute corner response
+        R = corner_response(M, k)
 
-    # Step 4: Threshold
-    R_threshold = threshold * R.max()
-    corner_mask = R > R_threshold
+        # Step 4: Threshold (adaptive or relative)
+        if use_adaptive_threshold:
+            R_threshold = compute_adaptive_threshold(R, threshold)
+        else:
+            R_threshold = threshold * R.max()
 
-    # Step 5: Non-maximum suppression
-    corner_mask = non_maximum_suppression(R, nms_size) & corner_mask
+        corner_mask = R > R_threshold
 
-    # Step 6: Extract corner coordinates
-    y_coords, x_coords = np.where(corner_mask)
-    corners = np.column_stack([x_coords, y_coords])
+        # Step 5: Non-maximum suppression
+        corner_mask = non_maximum_suppression(R, nms_size) & corner_mask
 
-    # Step 7: Sort by response and limit number
-    if len(corners) > max_corners:
-        # Get response values for each corner
-        responses = R[y_coords, x_coords]
-        # Sort by descending response
-        sorted_indices = np.argsort(responses)[::-1]
-        corners = corners[sorted_indices[:max_corners]]
+        # Step 6: Extract corner coordinates
+        y_coords, x_coords = np.where(corner_mask)
+        corners = np.column_stack([x_coords, y_coords])
+
+        # Step 7: Sort by response and limit number
+        if len(corners) > max_corners:
+            # Get response values for each corner
+            responses = R[y_coords, x_coords]
+            # Sort by descending response
+            sorted_indices = np.argsort(responses)[::-1]
+            corners = corners[sorted_indices[:max_corners]]
 
     return corners
 
@@ -229,6 +246,170 @@ def non_maximum_suppression(response: np.ndarray, window_size: int = 5) -> np.nd
     mask = (response == max_response) & (response > 0)
 
     return mask
+
+
+def compute_adaptive_threshold(R: np.ndarray, base_threshold: float) -> float:
+    """
+    Compute adaptive threshold based on response distribution
+
+    Instead of using a fixed percentage of max response, use statistics
+    that are less sensitive to outliers (high-contrast labels)
+
+    Args:
+        R: Corner response map (H, W)
+        base_threshold: Base threshold multiplier
+
+    Returns:
+        Adaptive threshold value
+    """
+    # Flatten and remove negative values
+    responses = R[R > 0].flatten()
+
+    if len(responses) == 0:
+        return 0.0
+
+    # Use percentile-based threshold (more robust than max)
+    # This prevents high-contrast labels from dominating the threshold
+    percentile_95 = np.percentile(responses, 95)
+    median = np.median(responses)
+
+    # Adaptive threshold: between median and 95th percentile
+    # This captures both strong features (labels) and weaker features (bottle edges)
+    adaptive_threshold = median + base_threshold * (percentile_95 - median)
+
+    return adaptive_threshold
+
+
+def detect_multiscale_corners(image: np.ndarray, k: float, threshold: float,
+                               window_size: int, base_sigma: float,
+                               nms_size: int, max_corners: int,
+                               use_adaptive: bool) -> np.ndarray:
+    """
+    Detect Harris corners at multiple scales to capture both fine and coarse features
+
+    Multi-scale detection helps detect:
+    - Fine scale (sigma=1.0): High-contrast text on labels
+    - Medium scale (sigma=1.5): Label edges and bottle cap details
+    - Coarse scale (sigma=2.5): Bottle body edges and large structures
+
+    Args:
+        image: Grayscale image (H, W)
+        k: Harris parameter
+        threshold: Threshold value
+        window_size: Structure tensor window size
+        base_sigma: Base sigma for Gaussian
+        nms_size: NMS window size
+        max_corners: Maximum corners to return
+        use_adaptive: Use adaptive thresholding
+
+    Returns:
+        corners: Combined corners from all scales (N, 2)
+    """
+    # Define multiple scales
+    scales = [
+        (1.0, 0.3),   # Fine scale: captures text and small details (30% weight)
+        (1.5, 0.4),   # Medium scale: captures label edges (40% weight)
+        (2.5, 0.3),   # Coarse scale: captures bottle outlines (30% weight)
+    ]
+
+    all_corners = []
+    all_responses = []
+
+    for sigma, weight in scales:
+        # Compute gradients
+        Ix, Iy = compute_gradients(image)
+
+        # Compute structure tensor with this sigma
+        M = compute_structure_tensor(Ix, Iy, window_size, sigma)
+
+        # Compute corner response
+        R = corner_response(M, k)
+
+        # Threshold
+        if use_adaptive:
+            R_threshold = compute_adaptive_threshold(R, threshold)
+        else:
+            # For multiscale, use a more permissive threshold per scale
+            R_threshold = threshold * 0.5 * R.max()
+
+        corner_mask = R > R_threshold
+
+        # Non-maximum suppression
+        corner_mask = non_maximum_suppression(R, nms_size) & corner_mask
+
+        # Extract corners
+        y_coords, x_coords = np.where(corner_mask)
+        corners = np.column_stack([x_coords, y_coords])
+
+        # Get responses and weight them
+        responses = R[y_coords, x_coords] * weight
+
+        all_corners.append(corners)
+        all_responses.append(responses)
+
+    # Combine corners from all scales
+    if len(all_corners) > 0:
+        combined_corners = np.vstack([c for c in all_corners if len(c) > 0])
+        combined_responses = np.concatenate([r for r in all_responses if len(r) > 0])
+    else:
+        return np.array([])
+
+    # Remove duplicates (corners detected at multiple scales)
+    unique_corners, unique_responses = remove_duplicate_corners(
+        combined_corners, combined_responses, tolerance=3.0
+    )
+
+    # Sort by response and limit
+    if len(unique_corners) > max_corners:
+        sorted_indices = np.argsort(unique_responses)[::-1]
+        unique_corners = unique_corners[sorted_indices[:max_corners]]
+
+    return unique_corners
+
+
+def remove_duplicate_corners(corners: np.ndarray, responses: np.ndarray,
+                             tolerance: float = 3.0) -> tuple:
+    """
+    Remove duplicate corners that are very close to each other
+    Keep the one with highest response
+
+    Args:
+        corners: Corner coordinates (N, 2)
+        responses: Corner responses (N,)
+        tolerance: Distance threshold for considering corners as duplicates
+
+    Returns:
+        unique_corners: Filtered corners (M, 2)
+        unique_responses: Corresponding responses (M,)
+    """
+    if len(corners) == 0:
+        return corners, responses
+
+    # Sort by response (descending)
+    sorted_indices = np.argsort(responses)[::-1]
+    sorted_corners = corners[sorted_indices]
+    sorted_responses = responses[sorted_indices]
+
+    # Keep track of which corners to keep
+    keep = np.ones(len(sorted_corners), dtype=bool)
+
+    for i in range(len(sorted_corners)):
+        if not keep[i]:
+            continue
+
+        # Check all remaining corners
+        for j in range(i + 1, len(sorted_corners)):
+            if not keep[j]:
+                continue
+
+            # Compute distance
+            dist = np.linalg.norm(sorted_corners[i] - sorted_corners[j])
+
+            # If too close, remove the weaker one (j, since sorted by response)
+            if dist < tolerance:
+                keep[j] = False
+
+    return sorted_corners[keep], sorted_responses[keep]
 
 
 if __name__ == "__main__":
