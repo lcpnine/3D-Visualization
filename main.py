@@ -15,7 +15,8 @@ from src.pointcloud import generator, filter as pcloud_filter, visualizer
 from utils import io_utils
 
 
-def main(image_dir: str = "data/scene1", output_dir: str = "output", max_images: int = None):
+def main(image_dir: str = "data/scene1", output_dir: str = "output", max_images: int = None,
+         enable_debug: bool = False):
     """
     Run complete SfM pipeline
 
@@ -23,9 +24,12 @@ def main(image_dir: str = "data/scene1", output_dir: str = "output", max_images:
         image_dir: Directory containing input images
         output_dir: Directory for output files
         max_images: Maximum number of images to process (None = all)
+        enable_debug: Enable visual debugging (generates debug visualizations)
     """
     print("=" * 70)
     print("Structure from Motion - Complete Pipeline")
+    if enable_debug:
+        print("DEBUG MODE ENABLED")
     print("=" * 70)
 
     start_time = time.time()
@@ -60,7 +64,9 @@ def main(image_dir: str = "data/scene1", output_dir: str = "output", max_images:
     print("PHASES 2-6: Incremental Reconstruction")
     print("=" * 70)
 
-    sfm = IncrementalSfM(images, K, verbose=cfg.VERBOSE)
+    debug_dir = str(Path(output_dir) / "debug")
+    sfm = IncrementalSfM(images, K, verbose=cfg.VERBOSE,
+                         enable_debug=enable_debug, debug_dir=debug_dir)
     result = sfm.reconstruct()
 
     cameras = result['cameras']
@@ -183,11 +189,13 @@ if __name__ == "__main__":
                        help="Directory for output files")
     parser.add_argument("--max_images", type=int, default=None,
                        help="Maximum number of images to process (default: all)")
+    parser.add_argument("--debug", action="store_true",
+                       help="Enable visual debugging (generates detailed visualizations at each stage)")
 
     args = parser.parse_args()
 
     try:
-        result = main(args.image_dir, args.output_dir, args.max_images)
+        result = main(args.image_dir, args.output_dir, args.max_images, args.debug)
         sys.exit(0)
     except Exception as e:
         print(f"\nError: {e}")
