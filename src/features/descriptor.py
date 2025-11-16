@@ -12,7 +12,7 @@ def compute_descriptors(image: np.ndarray, keypoints: np.ndarray,
                        patch_size: int = None, border: int = None,
                        verbose: bool = False, progress_interval: int = 500) -> np.ndarray:
     """
-    Compute descriptors for keypoints using normalized patches
+    Compute descriptors for keypoints using normalized patches (vectorized version)
 
     Args:
         image: Grayscale image (H, W) with values 0-1
@@ -20,7 +20,7 @@ def compute_descriptors(image: np.ndarray, keypoints: np.ndarray,
         patch_size: Patch size (default: from config)
         border: Border pixels to exclude (default: from config)
         verbose: Show progress during computation
-        progress_interval: Show progress every N keypoints
+        progress_interval: Show progress every N keypoints (ignored in vectorized version)
 
     Returns:
         descriptors: Descriptor matrix (M, patch_size²) where M <= N
@@ -47,23 +47,96 @@ def compute_descriptors(image: np.ndarray, keypoints: np.ndarray,
     if len(valid_keypoints) == 0:
         return np.array([])
 
-    # Extract and normalize descriptors
-    descriptors = []
-    total_kps = len(valid_keypoints)
+    if verbose:
+        print(f" extracting {len(valid_keypoints)} patches...", end='', flush=True)
 
-    for i, kp in enumerate(valid_keypoints):
-        # Show progress for large sets of keypoints
-        if verbose and total_kps >= progress_interval and (i + 1) % progress_interval == 0:
-            print(f" [{i+1}/{total_kps} descriptors]", end='', flush=True)
-
-        x, y = kp
-        patch = extract_patch(image, x, y, patch_size)
-        desc = normalize_descriptor(patch)
-        descriptors.append(desc)
-
-    descriptors = np.array(descriptors, dtype=np.float32)
+    # Vectorized extraction and normalization
+    descriptors = extract_patches_vectorized(image, valid_keypoints, patch_size)
+    descriptors = normalize_descriptors_vectorized(descriptors)
 
     return descriptors
+
+
+def extract_patches_vectorized(image: np.ndarray, keypoints: np.ndarray, size: int) -> np.ndarray:
+    """
+    Extract patches for all keypoints at once using vectorized operations
+
+    Args:
+        image: Grayscale image (H, W)
+        keypoints: Keypoint coordinates (N, 2) as (x, y)
+        size: Patch size
+
+    Returns:
+        patches: Array of patches (N, size, size)
+    """
+    half_size = size // 2
+    n_keypoints = len(keypoints)
+
+    # Create patch coordinate grid once
+    patch_y, patch_x = np.meshgrid(
+        np.arange(size) - half_size,
+        np.arange(size) - half_size,
+        indexing='ij'
+    )
+
+    # Expand dimensions for broadcasting: (1, size, size)
+    patch_x = patch_x[np.newaxis, :, :]
+    patch_y = patch_y[np.newaxis, :, :]
+
+    # Keypoint coordinates: (N, 1, 1)
+    kp_x = keypoints[:, 0, np.newaxis, np.newaxis]
+    kp_y = keypoints[:, 1, np.newaxis, np.newaxis]
+
+    # Broadcast to get all patch coordinates: (N, size, size)
+    img_x = kp_x + patch_x
+    img_y = kp_y + patch_y
+
+    # Flatten spatial dimensions for map_coordinates
+    # Shape: (2, N * size * size)
+    coordinates = np.array([
+        img_y.reshape(-1),
+        img_x.reshape(-1)
+    ])
+
+    # Sample all patches at once using bilinear interpolation
+    patches_flat = map_coordinates(image, coordinates, order=1, mode='constant', cval=0.0)
+
+    # Reshape back to (N, size, size)
+    patches = patches_flat.reshape(n_keypoints, size, size).astype(np.float32)
+
+    return patches
+
+
+def normalize_descriptors_vectorized(patches: np.ndarray) -> np.ndarray:
+    """
+    Normalize all patch descriptors at once using vectorized operations
+
+    Args:
+        patches: Array of patches (N, size, size)
+
+    Returns:
+        descriptors: Normalized descriptors (N, size*size)
+    """
+    N = len(patches)
+    patch_size = patches.shape[1]
+
+    # Flatten patches: (N, size*size)
+    descriptors = patches.reshape(N, -1)
+
+    # Zero mean, unit variance (vectorized)
+    means = descriptors.mean(axis=1, keepdims=True)
+    stds = descriptors.std(axis=1, keepdims=True)
+
+    # Handle constant patches (std == 0)
+    stds = np.where(stds > 1e-10, stds, 1.0)
+    descriptors = (descriptors - means) / stds
+
+    # L2 normalization (vectorized)
+    norms = np.linalg.norm(descriptors, axis=1, keepdims=True)
+    norms = np.where(norms > 1e-10, norms, 1.0)
+    descriptors = descriptors / norms
+
+    return descriptors.astype(np.float32)
 
 
 def extract_patch(image: np.ndarray, x: float, y: float, size: int) -> np.ndarray:
