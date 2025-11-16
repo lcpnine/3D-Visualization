@@ -10,9 +10,46 @@ Reconstructs 3D point clouds from multi-view images without external computer vi
 
 ### Prerequisites
 - Python 3.8 or higher
-- pip (Python package manager)
+- pip (Python package manager) OR Poetry (recommended)
 
 ### Installation
+
+#### Option 1: Using Poetry (Recommended)
+
+1. **Clone the repository** (if you haven't already):
+```bash
+git clone <your-repo-url>
+cd 3D-Visualization
+```
+
+2. **Install Poetry** (if not already installed):
+```bash
+curl -sSL https://install.python-poetry.org | python3 -
+```
+
+3. **Install dependencies with Poetry**:
+```bash
+poetry install
+```
+
+**Important**: This project requires `pillow-heif` for HEIC image support. Poetry will install it automatically.
+
+4. **Activate the Poetry environment**:
+```bash
+poetry shell
+```
+
+5. **Verify installation**:
+```bash
+python verify_setup.py
+```
+
+This will check that all required dependencies are properly installed. You should see:
+```
+✓ All dependencies are installed correctly!
+```
+
+#### Option 2: Using pip
 
 1. **Clone the repository** (if you haven't already):
 ```bash
@@ -32,11 +69,6 @@ pip install -r requirements.txt
 python verify_setup.py
 ```
 
-This will check that all required dependencies are properly installed. You should see:
-```
-✓ All dependencies are installed correctly!
-```
-
 If you see any errors, especially for `pillow-heif`, run:
 ```bash
 pip install pillow-heif
@@ -44,6 +76,21 @@ pip install pillow-heif
 
 ### Running the Pipeline
 
+#### If using Poetry:
+```bash
+# First activate the Poetry environment (if not already activated)
+poetry shell
+
+# Then run the pipeline
+python main.py --image_dir data/scene1 --max_images 5
+```
+
+**OR** run directly with Poetry without activating shell:
+```bash
+poetry run python main.py --image_dir data/scene1 --max_images 5
+```
+
+#### If using pip:
 ```bash
 python main.py --image_dir data/scene1 --max_images 5
 ```
@@ -57,16 +104,27 @@ python main.py --image_dir data/scene1 --max_images 5
 
 **Error: "cannot identify image file ... .HEIC"**
 - This means `pillow-heif` is not installed
-- Solution: `pip install pillow-heif`
-- Verify with: `python verify_setup.py`
+- Solution with Poetry: `poetry add pillow-heif` or `poetry install`
+- Solution with pip: `pip install pillow-heif`
+- Verify with: `python verify_setup.py` (or `poetry run python verify_setup.py`)
+
+**Error: "No module named ..."**
+- **With Poetry**: Make sure you activated the environment with `poetry shell` OR use `poetry run python ...`
+- **With pip**: Make sure all dependencies are installed: `pip install -r requirements.txt`
 
 **Error: "No images found"**
 - Check that your image directory exists
 - Make sure your images have `.HEIC` extension
 - The code looks for `*.HEIC` pattern by default
 
+**Poetry environment not found**
+- Run `poetry install` to create the environment and install dependencies
+- Use `poetry shell` to activate it
+- Or use `poetry run` prefix for commands
+
 **Import errors**
-- Make sure all dependencies are installed: `pip install -r requirements.txt`
+- **With Poetry**: Run `poetry install` to ensure all dependencies are installed
+- **With pip**: Run `pip install -r requirements.txt`
 - Check Python version: `python --version` (should be 3.8+)
 
 ---
