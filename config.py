@@ -14,13 +14,24 @@ class Config:
 
     # ==================== Phase 2: Feature Detection ====================
     # Harris Corner Detection
-    HARRIS_K = 0.05  # Harris corner response parameter (0.04-0.06)
-    HARRIS_THRESHOLD = 0.01  # Corner response threshold (relative to max)
+    HARRIS_K = 0.04  # Harris corner response parameter (lower = more corners)
+    HARRIS_THRESHOLD = 0.005  # Corner response threshold (lowered from 0.01 for better detection)
     HARRIS_WINDOW_SIZE = 5  # Window size for structure tensor
     HARRIS_SIGMA = 1.5  # Gaussian sigma for structure tensor
     NMS_WINDOW_SIZE = 5  # Non-maximum suppression window size
     TARGET_CORNERS_MIN = 500  # Minimum number of corners per image
-    TARGET_CORNERS_MAX = 2000  # Maximum number of corners per image
+    TARGET_CORNERS_MAX = 5000  # Maximum number of corners per image (increased from 2000)
+
+    # Enhanced Detection Methods
+    USE_MULTISCALE_DETECTION = True  # Enable multi-scale detection (detects both fine and coarse features)
+    USE_ADAPTIVE_THRESHOLD = True  # Enable adaptive thresholding (more robust than max-based threshold)
+
+    # Canny Edge Detection (for detecting object outlines like bottle bodies)
+    CANNY_SIGMA = 1.4  # Gaussian sigma for Canny edge detection
+    CANNY_LOW_THRESHOLD = 0.05  # Low threshold for hysteresis (relative to max gradient)
+    CANNY_HIGH_THRESHOLD = 0.15  # High threshold for hysteresis (relative to max gradient)
+    EDGE_CORNER_THRESHOLD = 4  # Minimum edge neighbors for corner detection
+    EDGE_CORNERS_MAX = 1000  # Maximum edge-based corners to extract
 
     # Feature Descriptor
     PATCH_SIZE = 8  # Patch size for descriptor (8x8 = 64 dimensions)
