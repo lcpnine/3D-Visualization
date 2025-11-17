@@ -4,14 +4,16 @@ Complete 3D reconstruction from HEIC images
 """
 
 import sys
-import numpy as np
 import time
 from pathlib import Path
 
+import numpy as np
+
 from config import cfg
-from src.preprocessing import image_loader, camera_calibration
+from src.pointcloud import filter as pcloud_filter
+from src.pointcloud import generator, visualizer
+from src.preprocessing import camera_calibration, image_loader
 from src.reconstruction.incremental import IncrementalSfM
-from src.pointcloud import generator, filter as pcloud_filter, visualizer
 from utils import io_utils
 
 
@@ -27,7 +29,7 @@ def main(image_dir: str = "data/scene1", output_dir: str = "output", max_images:
         enable_debug: Enable visual debugging (generates debug visualizations)
     """
     print("=" * 70)
-    print("Structure from Motion - Complete Pipeline")
+    print(f"Structure from Motion - Processing: {image_dir}")
     if enable_debug:
         print("DEBUG MODE ENABLED")
     print("=" * 70)
@@ -158,7 +160,7 @@ def main(image_dir: str = "data/scene1", output_dir: str = "output", max_images:
     # Print summary
     elapsed = time.time() - start_time
     print("\n" + "=" * 70)
-    print("RECONSTRUCTION COMPLETE!")
+    print(f"RECONSTRUCTION COMPLETE for {image_dir}")
     print("=" * 70)
     print(f"\nStatistics:")
     print(f"  Total processing time: {elapsed:.1f} seconds ({elapsed/60:.1f} minutes)")
@@ -180,25 +182,48 @@ def main(image_dir: str = "data/scene1", output_dir: str = "output", max_images:
 
 
 if __name__ == "__main__":
-    import argparse
+    # import argparse # 원본 argparse 코드 제거
 
-    parser = argparse.ArgumentParser(description="Structure from Motion Pipeline")
-    parser.add_argument("--image_dir", type=str, default="data/scene1",
-                       help="Directory containing input images")
-    parser.add_argument("--output_dir", type=str, default="output",
-                       help="Directory for output files")
-    parser.add_argument("--max_images", type=int, default=None,
-                       help="Maximum number of images to process (default: all)")
-    parser.add_argument("--debug", action="store_true",
-                       help="Enable visual debugging (generates detailed visualizations at each stage)")
+    # 처리할 씬 목록
+    scenes_to_process = ["data/scene1", "data/scene2", "data/scene3"]
+    
+    # 공통 설정
+    base_output_dir = "output"
+    max_images_all = None  # 모든 이미지 처리
+    debug_enabled = True   # 디버그 모드 활성화
 
-    args = parser.parse_args()
+    all_scenes_successful = True
 
-    try:
-        result = main(args.image_dir, args.output_dir, args.max_images, args.debug)
-        sys.exit(0)
-    except Exception as e:
-        print(f"\nError: {e}")
-        import traceback
-        traceback.print_exc()
+    for scene_dir in scenes_to_process:
+        print("*" * 80)
+        print(f"STARTING PIPELINE FOR SCENE: {scene_dir}")
+        print("*" * 80)
+
+        # 각 씬에 대한 고유한 출력 디렉터리 생성 (예: output/scene1)
+        scene_name = Path(scene_dir).name
+        current_output_dir = str(Path(base_output_dir) / scene_name)
+
+        try:
+            result = main(
+                image_dir=scene_dir,
+                output_dir=current_output_dir,
+                max_images=max_images_all,
+                enable_debug=debug_enabled
+            )
+            print(f"[SUCCESS] Finished processing {scene_dir}")
+        
+        except Exception as e:
+            print(f"\n[ERROR] FAILED processing {scene_dir}: {e}")
+            import traceback
+            traceback.print_exc()
+            all_scenes_successful = False
+            print(f"--- Skipping to next scene ---")
+
+    print("*" * 80)
+    print("All processing finished.")
+    if not all_scenes_successful:
+        print("One or more scenes failed to process.")
         sys.exit(1)
+    else:
+        print("All scenes processed successfully.")
+        sys.exit(0)

@@ -57,14 +57,14 @@ class Config:
 
     # ==================== Phase 3: Feature Matching ====================
     # Descriptor Matching
-    RATIO_TEST_THRESHOLD = 0.9  # ⭐ INCREASED from 0.8 - 더 관대하게 (view 변화가 크므로)
-    USE_SYMMETRIC_MATCHING = False
-    MIN_MATCHES = 20  # ⭐ DECREASED from 30 - 더 적은 매칭도 허용
+    RATIO_TEST_THRESHOLD = 0.7  # ⭐ 변경: SIFT에 맞게 0.7 ~ 0.75 권장 (기존 0.9)
+    USE_SYMMETRIC_MATCHING = True # ⭐ 변경: 품질 향상을 위해 활성화 (기존 False)
+    MIN_MATCHES = 30              # ⭐ 변경: 30 정도로 다시 설정 (기존 20)
 
     # RANSAC for Fundamental Matrix
-    RANSAC_ITERATIONS = 8000  # ⭐ INCREASED from 5000 - 더 많이 시도
-    RANSAC_THRESHOLD = 5.0  # ⭐ INCREASED from 3.0 - 더 관대하게
-    MIN_INLIERS = 10  # ⭐ DECREASED from 20 - 더 적은 inlier도 허용
+    RANSAC_ITERATIONS = 5000      # (기존 8000도 괜찮음)
+    RANSAC_THRESHOLD = 2.0        # ⭐ 변경: 더 엄격하게 (기존 5.0)
+    MIN_INLIERS = 30              # ⭐ 변경: 더 엄격하게 (기존 10)
 
     # ==================== Phase 4: Camera Pose Estimation ====================
     # Essential Matrix
@@ -72,20 +72,20 @@ class Config:
 
     # ==================== Phase 5: Triangulation ====================
     # Triangulation Quality
-    REPROJ_ERROR_THRESHOLD = 10.0  # ⭐ INCREASED from 5.0 - 초기 reconstruction을 위해 관대하게
-    MIN_PARALLAX_ANGLE = 0.5  # ⭐ DECREASED from 1.0 - 작은 각도도 허용
-    MIN_DEPTH = 0.3  # ⭐ DECREASED from 0.5
-    MAX_DEPTH = 50.0  # ⭐ INCREASED from 20.0 - 더 넓은 범위
+    REPROJ_ERROR_THRESHOLD = 3.0  # ⭐ 변경: 더 엄격하게 (기존 10.0)
+    MIN_PARALLAX_ANGLE = 1.0      # ⭐ 변경: (기존 0.5)
+    MIN_DEPTH = 0.5               # ⭐ 변경: (기존 0.3)
+    MAX_DEPTH = 20.0              # ⭐ 변경: (기존 50.0)
 
     # ==================== Phase 6: Incremental Reconstruction ====================
     # PnP RANSAC
     PNP_RANSAC_ITERATIONS = 5000  # INCREASED
-    PNP_RANSAC_THRESHOLD = 10.0  # ⭐ INCREASED - 관대하게
+    PNP_RANSAC_THRESHOLD = 3.0
     MIN_PNP_POINTS = 6
     MIN_PNP_INLIERS = 6  # ⭐ DECREASED from 10 - 더 적은 inlier 허용
 
     # Next Image Selection
-    MIN_2D3D_MATCHES = 10  # ⭐ DECREASED from 20 - 더 적은 매칭도 허용
+    MIN_2D3D_MATCHES = 20  # ⭐ DECREASED from 20 - 더 적은 매칭도 허용
 
     # ==================== Phase 7: Bundle Adjustment ====================
     # Optimization
