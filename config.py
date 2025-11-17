@@ -27,7 +27,7 @@ class Config:
     TARGET_CORNERS_MAX = 1000  # Maximum number of corners per image (optimized for speed)
 
     # Enhanced Detection Methods
-    USE_MULTISCALE_DETECTION = False  # Enable multi-scale detection (disabled for speed)
+    USE_MULTISCALE_DETECTION = True  # Enable multi-scale detection (disabled for speed)
     USE_ADAPTIVE_THRESHOLD = True  # Enable adaptive thresholding (more robust than max-based threshold)
 
     # SIFT Parameters (used when FEATURE_DETECTOR='sift')
@@ -71,8 +71,8 @@ class Config:
 
     # ==================== Phase 5: Triangulation ====================
     # Triangulation Quality
-    REPROJ_ERROR_THRESHOLD = 100.0  # Reprojection error threshold in pixels (relaxed for robustness)
-    MIN_PARALLAX_ANGLE = 0.01  # Minimum parallax angle in degrees (relaxed)
+    REPROJ_ERROR_THRESHOLD = 5.0  # Reprojection error threshold in pixels (relaxed for robustness)
+    MIN_PARALLAX_ANGLE = 1.0  # Minimum parallax angle in degrees (relaxed)
     MIN_DEPTH = 0.1  # Minimum depth for valid points (very permissive)
     MAX_DEPTH = 10000.0  # Maximum depth for valid points (very permissive)
 
