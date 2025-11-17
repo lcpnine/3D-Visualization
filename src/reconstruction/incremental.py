@@ -3,21 +3,23 @@ Phase 6: Incremental Structure from Motion
 Incrementally reconstructs 3D structure by adding images one at a time.
 """
 
-import numpy as np
-from typing import List, Dict, Tuple, Optional
 import sys
 import time
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
+
 sys.path.insert(0, '.')
 
 from config import cfg
-from src.preprocessing import camera_calibration
-from src.features import harris_detector, descriptor
-from src.features.feature_factory import detect_and_compute_features
-from src.matching import matcher, ransac
-from src.geometry import essential_matrix, pose_recovery
-from src.triangulation import triangulate, validation
-from src.reconstruction import pnp
 from src.debug.visualizer import DebugVisualizer
+from src.features import descriptor, harris_detector
+from src.features.feature_factory import detect_and_compute_features
+from src.geometry import essential_matrix, pose_recovery
+from src.matching import matcher, ransac
+from src.preprocessing import camera_calibration
+from src.reconstruction import pnp
+from src.triangulation import triangulate, validation
 
 
 class IncrementalSfM:
@@ -199,12 +201,32 @@ class IncrementalSfM:
             print("Initializing reconstruction with first two images...")
             print("-" * 70)
 
-        # Use first pair with sufficient matches
-        init_pair = None
-        for (i, j), matches in self.pairwise_matches.items():
-            if i == 0:  # Start with first image
-                init_pair = (i, j)
-                break
+        # -----------------------------------------------------------------
+        # [수정 시작] 베이스라인이 적절한 쌍을 찾도록 변경
+        # -----------------------------------------------------------------
+        
+        # (0, 1), (0, 2) 같은 너무 가까운 쌍 대신 (0, 5) 나 (0, 8)을 시도
+        # 5도 간격 * 6 = 30도 정도의 베이스라인을 확보
+        good_baseline_pairs = []
+        min_baseline_idx = 5  # 최소 5프레임 (약 25-30도)
+        max_baseline_idx = 10 # 최대 10프레임 (약 50도)
+
+        for i in range(self.n_images):
+            for j in range(i + min_baseline_idx, min(i + max_baseline_idx + 1, self.n_images)):
+                if (i, j) in self.pairwise_matches:
+                    good_baseline_pairs.append((i, j))
+        
+        if not good_baseline_pairs:
+             # 만약 적절한 쌍이 없으면 원래 로직(가까운 쌍)으로 다시 시도
+            if self.verbose:
+                print("No wide-baseline pair found. Trying standard sequential pairs...")
+            for (i, j), matches in self.pairwise_matches.items():
+                if i == 0: 
+                    init_pair = (i, j)
+                    break
+        else:
+            # TODO: 여기서 매치 개수가 가장 많은 쌍을 고르는 로직을 추가하면 더 좋음
+            init_pair = good_baseline_pairs[0] # 일단 첫 번째로 찾은 쌍 사용
 
         if init_pair is None:
             raise RuntimeError("No valid image pair for initialization")
