@@ -201,35 +201,41 @@ class IncrementalSfM:
             print("Initializing reconstruction with first two images...")
             print("-" * 70)
 
-        # -----------------------------------------------------------------
-        # [수정 시작] 베이스라인이 적절한 쌍을 찾도록 변경
-        # -----------------------------------------------------------------
+        init_pair = None
         
-        # (0, 1), (0, 2) 같은 너무 가까운 쌍 대신 (0, 5) 나 (0, 8)을 시도
-        # 5도 간격 * 6 = 30도 정도의 베이스라인을 확보
-        good_baseline_pairs = []
-        min_baseline_idx = 5  # 최소 5프레임 (약 25-30도)
-        max_baseline_idx = 10 # 최대 10프레임 (약 50도)
+        # 5도 간격으로 찍었으므로, 5~8 프레임 떨어진 쌍을 찾는다.
+        # (예: 5*6=30도, 5*8=40도)
+        # 이 범위가 3D 복원에 가장 이상적인 'Wide Baseline'이다.
+        min_frame_gap = 5
+        max_frame_gap = 10 
 
-        for i in range(self.n_images):
-            for j in range(i + min_baseline_idx, min(i + max_baseline_idx + 1, self.n_images)):
-                if (i, j) in self.pairwise_matches:
-                    good_baseline_pairs.append((i, j))
+        best_pair = None
+        best_matches = 0
+
+        # 0번 이미지를 기준으로 가장 매치가 많은 '적절한' 쌍을 찾는다
+        i = 0
+        for j in range(i + min_frame_gap, min(i + max_frame_gap + 1, self.n_images)):
+            pair_key = (i, j)
+            if pair_key in self.pairwise_matches:
+                current_matches = len(self.pairwise_matches[pair_key])
+                if current_matches > best_matches:
+                    best_matches = current_matches
+                    best_pair = pair_key
+
+        init_pair = best_pair
         
-        if not good_baseline_pairs:
-             # 만약 적절한 쌍이 없으면 원래 로직(가까운 쌍)으로 다시 시도
+        # 만약 (0, 5~10) 쌍을 못 찾으면, 그냥 원래 로직대로 (0, 1)이든 (0, 2)든 시도한다.
+        if init_pair is None:
             if self.verbose:
-                print("No wide-baseline pair found. Trying standard sequential pairs...")
+                print(f"  Warning: No ideal wide-baseline pair found (e.g., 0 vs 5-10).")
+                print(f"  Falling back to closest sequential pair...")
             for (i, j), matches in self.pairwise_matches.items():
-                if i == 0: 
+                if i == 0:  # Start with first image
                     init_pair = (i, j)
                     break
         else:
-            # TODO: 여기서 매치 개수가 가장 많은 쌍을 고르는 로직을 추가하면 더 좋음
-            init_pair = good_baseline_pairs[0] # 일단 첫 번째로 찾은 쌍 사용
-
-        if init_pair is None:
-            raise RuntimeError("No valid image pair for initialization")
+             if self.verbose:
+                print(f"  Selected wide-baseline pair {init_pair} with {best_matches} matches for initialization.")
 
         i, j = init_pair
         matches_ij = self.pairwise_matches[(i, j)]
