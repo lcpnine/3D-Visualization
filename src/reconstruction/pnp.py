@@ -1,6 +1,10 @@
 """
 Phase 6 - Step 6.2: PnP (Perspective-n-Point) Solver
 Estimates camera pose from 2D-3D correspondences using RANSAC-based PnP.
+
+Improved version using OpenCV-style algorithms:
+- P3P for minimal RANSAC sets (3 points)
+- EPnP for refinement and larger sets
 """
 
 import numpy as np
@@ -9,21 +13,34 @@ import sys
 sys.path.insert(0, '.')
 from config import cfg
 from utils.math_utils import svd_solve, enforce_orthogonal
+from src.reconstruction.epnp import solve_epnp
+from src.reconstruction.p3p import solve_p3p
 
 
 def solve_pnp_ransac(points_3d: np.ndarray, points_2d: np.ndarray, K: np.ndarray,
                      iterations: int = None, threshold: float = None,
-                     random_seed: int = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+                     random_seed: int = None,
+                     use_p3p: bool = True,
+                     use_epnp: bool = True,
+                     confidence: float = 0.99) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
-    Solve PnP using RANSAC
+    Solve PnP using RANSAC with OpenCV-style improvements
+
+    Improvements:
+    - P3P for minimal RANSAC sets (3 points) - faster and more efficient
+    - EPnP for refinement - more accurate than DLT
+    - Adaptive RANSAC iteration count
 
     Args:
         points_3d: 3D points in world coordinates (N, 3)
         points_2d: Corresponding 2D points in image (N, 2)
         K: Intrinsic matrix (3, 3)
-        iterations: Number of RANSAC iterations (default: from config)
+        iterations: Maximum number of RANSAC iterations (default: from config)
         threshold: Inlier threshold in pixels (default: from config)
         random_seed: Random seed for reproducibility
+        use_p3p: Use P3P for minimal sets (default: True)
+        use_epnp: Use EPnP for refinement (default: True)
+        confidence: Desired confidence level for adaptive RANSAC
 
     Returns:
         R: Rotation matrix (3, 3)
@@ -38,8 +55,10 @@ def solve_pnp_ransac(points_3d: np.ndarray, points_2d: np.ndarray, K: np.ndarray
         random_seed = cfg.RANDOM_SEED
 
     N = len(points_3d)
-    if N < 6:
-        raise ValueError(f"Need at least 6 points for PnP, got {N}")
+    min_points = 3 if use_p3p else 6
+
+    if N < min_points:
+        raise ValueError(f"Need at least {min_points} points for PnP, got {N}")
 
     np.random.seed(random_seed)
 
@@ -48,41 +67,85 @@ def solve_pnp_ransac(points_3d: np.ndarray, points_2d: np.ndarray, K: np.ndarray
     best_inliers = None
     best_num_inliers = 0
 
-    for iter in range(iterations):
-        # Randomly sample 6 points
-        sample_indices = np.random.choice(N, 6, replace=False)
+    # Adaptive RANSAC
+    max_iterations = iterations
+    iterations_done = 0
+
+    for iter in range(max_iterations):
+        iterations_done = iter + 1
+
+        # Randomly sample minimal set
+        sample_indices = np.random.choice(N, min_points, replace=False)
         sample_3d = points_3d[sample_indices]
         sample_2d = points_2d[sample_indices]
 
-        # Solve PnP with 6 points
+        # Solve PnP with minimal set
         try:
-            R, t = dlt_pnp(sample_3d, sample_2d, K)
+            if use_p3p and min_points == 3:
+                # P3P can return multiple solutions, test all
+                poses = solve_p3p(sample_3d, sample_2d, K)
+                if len(poses) == 0:
+                    continue
+
+                # Test all candidate poses
+                for R_cand, t_cand in poses:
+                    errors = compute_reprojection_errors(points_3d, points_2d, K, R_cand, t_cand)
+                    inliers = errors < threshold
+                    num_inliers = np.sum(inliers)
+
+                    if num_inliers > best_num_inliers:
+                        best_num_inliers = num_inliers
+                        best_inliers = inliers
+                        best_R = R_cand
+                        best_t = t_cand
+
+            else:
+                # Use DLT for larger minimal sets
+                R, t = dlt_pnp(sample_3d, sample_2d, K)
+
+                # Count inliers
+                errors = compute_reprojection_errors(points_3d, points_2d, K, R, t)
+                inliers = errors < threshold
+                num_inliers = np.sum(inliers)
+
+                if num_inliers > best_num_inliers:
+                    best_num_inliers = num_inliers
+                    best_inliers = inliers
+                    best_R = R
+                    best_t = t
+
         except:
             continue
 
-        # Count inliers
-        errors = compute_reprojection_errors(points_3d, points_2d, K, R, t)
-        inliers = errors < threshold
-        num_inliers = np.sum(inliers)
+        # Adaptive RANSAC: update iteration count
+        if best_num_inliers > min_points:
+            inlier_ratio = best_num_inliers / N
+            inlier_ratio = max(min(inlier_ratio, 0.99), 0.01)
 
-        if num_inliers > best_num_inliers:
-            best_num_inliers = num_inliers
-            best_inliers = inliers
-            best_R = R
-            best_t = t
+            denominator = np.log(1.0 - inlier_ratio ** min_points)
+            if denominator < -1e-10:
+                k_adaptive = int(np.log(1.0 - confidence) / denominator)
+                max_iterations = min(k_adaptive, iterations)
 
-            if cfg.VERBOSE and (iter % 200 == 0 or num_inliers > 0.8 * N):
-                print(f"  PnP RANSAC iter {iter}: {num_inliers}/{N} inliers ({100*num_inliers/N:.1f}%)")
+        if cfg.VERBOSE and (iter % 200 == 0 or best_num_inliers > 0.8 * N):
+            print(f"  PnP RANSAC iter {iter}: {best_num_inliers}/{N} inliers ({100*best_num_inliers/N:.1f}%), max_iter={max_iterations}")
 
     if best_R is None:
         raise RuntimeError("PnP RANSAC failed to find a valid pose")
+
+    if cfg.VERBOSE:
+        print(f"  PnP RANSAC completed in {iterations_done} iterations (max was {max_iterations})")
 
     # Refine using all inliers
     inlier_3d = points_3d[best_inliers]
     inlier_2d = points_2d[best_inliers]
 
     try:
-        R_refined, t_refined = dlt_pnp(inlier_3d, inlier_2d, K)
+        # Use EPnP for refinement if available and enough inliers
+        if use_epnp and len(inlier_3d) >= 4:
+            R_refined, t_refined = solve_epnp(inlier_3d, inlier_2d, K)
+        else:
+            R_refined, t_refined = dlt_pnp(inlier_3d, inlier_2d, K)
 
         # Recompute inliers
         errors = compute_reprojection_errors(points_3d, points_2d, K, R_refined, t_refined)
@@ -93,6 +156,8 @@ def solve_pnp_ransac(points_3d: np.ndarray, points_2d: np.ndarray, K: np.ndarray
 
         return R_refined, t_refined, final_inliers
     except:
+        if cfg.VERBOSE:
+            print(f"  Refinement failed, using RANSAC result")
         return best_R, best_t, best_inliers
 
 

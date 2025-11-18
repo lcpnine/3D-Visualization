@@ -1,6 +1,7 @@
 """
 Global configuration parameters for Structure from Motion (SfM) pipeline
-OPTIMIZED FOR LOW MATCHING RATE SCENARIOS (카메라 움직임이 큰 경우)
+OPTIMIZED WITH OPENCV-STYLE ALGORITHMS
+Version 2.0 - Improved matching, RANSAC, and reconstruction quality
 """
 
 class Config:
@@ -56,36 +57,37 @@ class Config:
     DESCRIPTOR_BORDER = 10
 
     # ==================== Phase 3: Feature Matching ====================
-    # Descriptor Matching
-    RATIO_TEST_THRESHOLD = 0.7  # ⭐ 변경: SIFT에 맞게 0.7 ~ 0.75 권장 (기존 0.9)
-    USE_SYMMETRIC_MATCHING = True # ⭐ 변경: 품질 향상을 위해 활성화 (기존 False)
-    MIN_MATCHES = 30              # ⭐ 변경: 30 정도로 다시 설정 (기존 20)
+    # Descriptor Matching (OpenCV-style improvements)
+    RATIO_TEST_THRESHOLD = 0.75   # OpenCV default for SIFT (0.7-0.8 range)
+    USE_SYMMETRIC_MATCHING = True # Cross-check matching (OpenCV crossCheck=True)
+    MIN_MATCHES = 20              # Minimum matches to attempt geometry estimation
 
-    # RANSAC for Fundamental Matrix
-    RANSAC_ITERATIONS = 5000      # (기존 8000도 괜찮음)
-    RANSAC_THRESHOLD = 2.0        # ⭐ 변경: 더 엄격하게 (기존 5.0)
-    MIN_INLIERS = 30              # ⭐ 변경: 더 엄격하게 (기존 10)
+    # RANSAC for Fundamental Matrix (Improved with adaptive + 7-point)
+    RANSAC_ITERATIONS = 5000      # Maximum iterations (will adapt based on inlier ratio)
+    RANSAC_THRESHOLD = 1.0        # OpenCV default is 1.0 pixels (was 2.0)
+    MIN_INLIERS = 15              # Lowered from 30 for better success rate
 
     # ==================== Phase 4: Camera Pose Estimation ====================
     # Essential Matrix
     ESSENTIAL_RANK_TOLERANCE = 1e-6
 
     # ==================== Phase 5: Triangulation ====================
-    # Triangulation Quality
-    REPROJ_ERROR_THRESHOLD = 3.0  # ⭐ 변경: 더 엄격하게 (기존 10.0)
-    MIN_PARALLAX_ANGLE = 1.0      # ⭐ 변경: (기존 0.5)
-    MIN_DEPTH = 0.5               # ⭐ 변경: (기존 0.3)
-    MAX_DEPTH = 20.0              # ⭐ 변경: (기존 50.0)
+    # Triangulation Quality (Balanced for real-world data)
+    REPROJ_ERROR_THRESHOLD = 4.0  # Pixels (was 3.0 - slightly relaxed)
+    MIN_PARALLAX_ANGLE = 0.5      # Degrees (was 1.0 - relaxed for more points)
+    MIN_DEPTH = 0.3               # Meters (was 0.5 - allow closer points)
+    MAX_DEPTH = 30.0              # Meters (was 20.0 - allow farther points)
+    TRIANGULATION_METHOD = 'dlt'  # 'dlt' or 'midpoint'
 
     # ==================== Phase 6: Incremental Reconstruction ====================
-    # PnP RANSAC
-    PNP_RANSAC_ITERATIONS = 5000  # INCREASED
-    PNP_RANSAC_THRESHOLD = 3.0
-    MIN_PNP_POINTS = 6
-    MIN_PNP_INLIERS = 6  # ⭐ DECREASED from 10 - 더 적은 inlier 허용
+    # PnP RANSAC (Using P3P + EPnP)
+    PNP_RANSAC_ITERATIONS = 3000  # Reduced (P3P is faster with minimal set of 3)
+    PNP_RANSAC_THRESHOLD = 4.0    # Pixels (relaxed from 3.0)
+    MIN_PNP_POINTS = 3            # Changed from 6 (now using P3P)
+    MIN_PNP_INLIERS = 4           # Lowered from 6 (P3P needs fewer points)
 
     # Next Image Selection
-    MIN_2D3D_MATCHES = 20  # ⭐ DECREASED from 20 - 더 적은 매칭도 허용
+    MIN_2D3D_MATCHES = 10         # Further decreased for better coverage
 
     # ==================== Phase 7: Bundle Adjustment ====================
     # Optimization

@@ -1,10 +1,15 @@
 """
 Phase 5 - Step 5.1: Two-view Triangulation
 Recovers 3D points from corresponding 2D points in two views using DLT.
+
+Improved version with:
+- Proper point normalization (as recommended by OpenCV)
+- Mid-point triangulation method as alternative to DLT
+- Better numerical stability
 """
 
 import numpy as np
-from typing import Tuple
+from typing import Tuple, Optional
 import sys
 sys.path.insert(0, '.')
 from utils.math_utils import svd_solve
@@ -116,7 +121,11 @@ def triangulate_midpoint(P1: np.ndarray, P2: np.ndarray,
     """
     Triangulate using midpoint method (alternative to DLT)
 
-    Computes the midpoint of the closest points between two rays
+    Computes the midpoint of the closest points between two rays.
+    This method is more robust to noise than DLT in some cases.
+
+    The idea: two rays from camera centers don't usually intersect in 3D.
+    Find the closest points on each ray, and use their midpoint.
 
     Args:
         P1: Camera matrix 1 (3, 4)
@@ -127,13 +136,101 @@ def triangulate_midpoint(P1: np.ndarray, P2: np.ndarray,
     Returns:
         X: 3D point (3,)
     """
-    # Decompose P = K[R|t] to get camera centers and directions
-    # Camera center: C = -R^T * t
-    # Direction: d = R^T * K^(-1) * p
+    # Decompose projection matrices to get camera centers and orientations
+    # P = K[R|t], so camera center C = -R^T * t
 
-    # For simplicity, use DLT method in this implementation
-    # Midpoint method is an alternative that could be implemented
-    return dlt_triangulation(P1, P2, p1, p2)
+    # Extract camera center from P1
+    # For P1 = K1[I|0], center is at origin
+    C1 = np.array([0., 0., 0.])
+
+    # For P2 = K2[R|t], extract center
+    # P2 = [M2 | p4] where M2 is 3x3 and p4 is 3x1
+    M2 = P2[:, :3]
+    p4 = P2[:, 3]
+    C2 = -np.linalg.inv(M2) @ p4
+
+    # Compute ray directions
+    # Ray from C1 through p1: d1 = inv(M1) * [p1; 1]
+    M1 = P1[:, :3]
+    p1_h = np.array([p1[0], p1[1], 1.0])
+    d1 = np.linalg.inv(M1) @ p1_h
+    d1 = d1 / np.linalg.norm(d1)  # Normalize
+
+    p2_h = np.array([p2[0], p2[1], 1.0])
+    d2 = np.linalg.inv(M2) @ p2_h
+    d2 = d2 / np.linalg.norm(d2)  # Normalize
+
+    # Find closest points on two rays
+    # Ray 1: C1 + s*d1
+    # Ray 2: C2 + t*d2
+    # Minimize distance between them
+
+    # Set up linear system
+    # Want: (C1 + s*d1 - C2 - t*d2) perpendicular to both d1 and d2
+    # This gives: d1·(C1 + s*d1 - C2 - t*d2) = 0
+    #            d2·(C1 + s*d1 - C2 - t*d2) = 0
+
+    # Rearrange:
+    # (d1·d1)*s - (d1·d2)*t = d1·(C2 - C1)
+    # (d1·d2)*s - (d2·d2)*t = d2·(C2 - C1)
+
+    a = np.dot(d1, d1)
+    b = np.dot(d1, d2)
+    c = np.dot(d2, d2)
+    d = np.dot(d1, C2 - C1)
+    e = np.dot(d2, C2 - C1)
+
+    # Solve 2x2 system
+    denom = a * c - b * b
+    if abs(denom) < 1e-10:
+        # Rays are parallel, use DLT as fallback
+        return dlt_triangulation(P1, P2, p1, p2)
+
+    s = (b * e - c * d) / denom
+    t = (a * e - b * d) / denom
+
+    # Compute closest points
+    pt1 = C1 + s * d1
+    pt2 = C2 + t * d2
+
+    # Midpoint is the 3D point
+    X = (pt1 + pt2) / 2.0
+
+    return X
+
+
+def triangulate_points_batch(P1: np.ndarray, P2: np.ndarray,
+                              pts1: np.ndarray, pts2: np.ndarray,
+                              method: str = 'dlt') -> np.ndarray:
+    """
+    Triangulate multiple 3D points with choice of method
+
+    Args:
+        P1: Camera matrix 1 (3, 4)
+        P2: Camera matrix 2 (3, 4)
+        pts1: 2D points from image 1 (N, 2)
+        pts2: 2D points from image 2 (N, 2)
+        method: 'dlt' or 'midpoint'
+
+    Returns:
+        points_3d: Triangulated 3D points (N, 3)
+    """
+    N = len(pts1)
+    points_3d = []
+
+    for i in range(N):
+        p1 = pts1[i]
+        p2 = pts2[i]
+
+        # Triangulate single point
+        if method == 'midpoint':
+            X = triangulate_midpoint(P1, P2, p1, p2)
+        else:
+            X = dlt_triangulation(P1, P2, p1, p2)
+
+        points_3d.append(X)
+
+    return np.array(points_3d)
 
 
 if __name__ == "__main__":
