@@ -12,9 +12,12 @@ def match_descriptors(desc1: np.ndarray, desc2: np.ndarray,
                      ratio_threshold: float = None,
                      use_symmetric: bool = None,
                      debug: bool = False,
-                     descriptor_type: str = 'float') -> Tuple[np.ndarray, np.ndarray]:
+                     descriptor_type: str = 'float',
+                     use_crosscheck: bool = True,
+                     distance_threshold: float = None) -> Tuple[np.ndarray, np.ndarray]:
     """
     Match descriptors between two images using brute-force matching with ratio test
+    Improved version based on OpenCV's BFMatcher internal implementation
 
     Args:
         desc1: Descriptors from image 1 (N1, D)
@@ -23,6 +26,8 @@ def match_descriptors(desc1: np.ndarray, desc2: np.ndarray,
         use_symmetric: Use symmetric matching (default: from config)
         debug: Print debug information (default: False)
         descriptor_type: Type of descriptors ('float' for L2, 'binary' for Hamming)
+        use_crosscheck: Use OpenCV-style cross-check (mutual consistency)
+        distance_threshold: Maximum allowed match distance (optional)
 
     Returns:
         matches: Array of matches (M, 2) where each row is [idx1, idx2]
@@ -44,25 +49,35 @@ def match_descriptors(desc1: np.ndarray, desc2: np.ndarray,
     matches_12, distances_12 = match_with_ratio_test(dist_matrix, ratio_threshold, debug=debug)
 
     if debug:
-        print(f"    Forward matches: {len(matches_12)}")
+        print(f"    Forward matches (after ratio test): {len(matches_12)}")
 
-    if use_symmetric:
+    # Cross-check: OpenCV-style mutual consistency check
+    if use_crosscheck or use_symmetric:
         # Backward matching (image 2 to image 1)
         dist_matrix_T = dist_matrix.T
         matches_21, distances_21 = match_with_ratio_test(dist_matrix_T, ratio_threshold, debug=False)
 
         if debug:
-            print(f"    Backward matches: {len(matches_21)}")
+            print(f"    Backward matches (after ratio test): {len(matches_21)}")
 
-        # Keep only symmetric matches
-        matches, distances = symmetric_matching(matches_12, distances_12,
-                                               matches_21, distances_21)
+        # Keep only cross-consistent matches (i->j and j->i)
+        matches, distances = cross_check_matching(matches_12, distances_12,
+                                                  matches_21, distances_21)
 
         if debug:
-            print(f"    Symmetric matches: {len(matches)}")
+            print(f"    Cross-checked matches: {len(matches)}")
     else:
         matches = matches_12
         distances = distances_12
+
+    # Additional distance threshold filtering (OpenCV-style)
+    if distance_threshold is not None and len(matches) > 0:
+        valid_mask = distances < distance_threshold
+        matches = matches[valid_mask]
+        distances = distances[valid_mask]
+
+        if debug:
+            print(f"    After distance threshold filtering: {len(matches)}")
 
     return matches, distances
 
@@ -214,6 +229,51 @@ def symmetric_matching(matches_12: np.ndarray, distances_12: np.ndarray,
     symmetric_distances = np.array(symmetric_distances)
 
     return symmetric_matches, symmetric_distances
+
+
+def cross_check_matching(matches_12: np.ndarray, distances_12: np.ndarray,
+                         matches_21: np.ndarray, distances_21: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    OpenCV-style cross-check: Keep only matches where (i,j) in forward matches AND (j,i) in backward matches
+    This implements the crossCheck parameter from OpenCV's BFMatcher
+
+    The difference from symmetric_matching is that cross-check ensures mutual best matches:
+    - i's best match is j, AND j's best match is i
+
+    Args:
+        matches_12: Forward matches (M1, 2) where each row is [idx1, idx2]
+        distances_12: Forward match distances (M1,)
+        matches_21: Backward matches (M2, 2) where each row is [idx2, idx1]
+        distances_21: Backward match distances (M2,)
+
+    Returns:
+        cross_checked_matches: Cross-checked matches (M, 2)
+        cross_checked_distances: Cross-checked match distances (M,)
+    """
+    if len(matches_12) == 0 or len(matches_21) == 0:
+        return np.array([]), np.array([])
+
+    # Build lookup set for backward matches (store as (j, i) pairs)
+    backward_set = set()
+    for match in matches_21:
+        # matches_21 has format [idx2, idx1], so we swap to get (idx1, idx2) format
+        backward_set.add((match[1], match[0]))
+
+    # Filter forward matches
+    cross_checked_matches = []
+    cross_checked_distances = []
+
+    for idx, match in enumerate(matches_12):
+        i, j = match[0], match[1]
+        # Check if (i, j) exists in backward matches
+        if (i, j) in backward_set:
+            cross_checked_matches.append([i, j])
+            cross_checked_distances.append(distances_12[idx])
+
+    if len(cross_checked_matches) == 0:
+        return np.array([]), np.array([])
+
+    return np.array(cross_checked_matches), np.array(cross_checked_distances)
 
 
 def filter_matches_by_distance(matches: np.ndarray, distances: np.ndarray,
