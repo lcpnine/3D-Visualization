@@ -185,7 +185,7 @@ if __name__ == "__main__":
     # import argparse # 원본 argparse 코드 제거
 
     # 처리할 씬 목록
-    scenes_to_process = ["data/scene1", "data/scene2", "data/scene3", "data/scene4"]
+    scenes_to_process = ["data/scene5", "data/scene8"]
     
     # 공통 설정
     base_output_dir = "output"
