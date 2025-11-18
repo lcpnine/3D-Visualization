@@ -3,12 +3,15 @@ Phase 3 - Step 3.2: RANSAC and Fundamental Matrix Estimation
 Removes outlier matches and estimates the fundamental matrix.
 """
 
-import numpy as np
-from typing import Tuple
-from config import cfg
 import sys
+from typing import List, Tuple
+
+import numpy as np
+
+from config import cfg
+
 sys.path.insert(0, '.')
-from utils.math_utils import svd_solve, normalize_homogeneous
+from utils.math_utils import normalize_homogeneous, svd_solve
 
 
 def estimate_fundamental_matrix_ransac(points1: np.ndarray, points2: np.ndarray,
@@ -456,10 +459,10 @@ def compute_epipolar_error(F: np.ndarray, pts1: np.ndarray, pts2: np.ndarray) ->
 
 if __name__ == "__main__":
     # Test RANSAC and fundamental matrix estimation
-    from src.preprocessing.image_loader import load_images
-    from src.features.harris_detector import detect_harris_corners
     from src.features.descriptor import compute_descriptors
-    from src.matching.matcher import match_descriptors, get_matched_points
+    from src.features.harris_detector import detect_harris_corners
+    from src.matching.matcher import get_matched_points, match_descriptors
+    from src.preprocessing.image_loader import load_images
 
     print("Testing RANSAC and Fundamental Matrix Estimation")
     print("=" * 50)
