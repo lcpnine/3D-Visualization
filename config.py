@@ -73,10 +73,10 @@ class Config:
 
     # ==================== Phase 5: Triangulation ====================
     # Triangulation Quality (Balanced for real-world data)
-    REPROJ_ERROR_THRESHOLD = 4.0  # Pixels (was 3.0 - slightly relaxed)
-    MIN_PARALLAX_ANGLE = 0.5      # Degrees (was 1.0 - relaxed for more points)
-    MIN_DEPTH = 0.3               # Meters (was 0.5 - allow closer points)
-    MAX_DEPTH = 30.0              # Meters (was 20.0 - allow farther points)
+    REPROJ_ERROR_THRESHOLD = 10.0  # Pixels (was 3.0 - slightly relaxed)
+    MIN_PARALLAX_ANGLE = 0.5
+    MIN_DEPTH = 0.1
+    MAX_DEPTH = 1000.0
     TRIANGULATION_METHOD = 'dlt'  # 'dlt' or 'midpoint'
 
     # ==================== Phase 6: Incremental Reconstruction ====================
